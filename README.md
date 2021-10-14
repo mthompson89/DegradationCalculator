@@ -1,6 +1,6 @@
 # Degradation Calculator
 ## Overview
-This is an R Shiny application used to calculate an approximate degradation level based off of Gunn et. al. (2019) degradation framework. This app also implaments Ducey and Knapp (2018) relative density equation to calculate the A-line, B-line and C-line in a mixed species gingrich stocking chart. 
+This is an R Shiny application used to calculate an approximate degradation level based off of Gunn et. al. (2019) degradation framework. This app also implaments Ducey and Knapp (2018) relative density equation to calculate the A-line, B-line and C-line in a mixed species stocking chart. 
 
 ## Description
 Gunn et al. (2019) determined that, due to past silvicultural practices, much of new england forests are comprised of species of low desirability (American beech, balsam fir, grey birch etc.) and what desirable species remained were of unacceptable growing stick (i.e. lacked 8ft saw logs). This determination lead the group to build a degradation framework wherein a stand was classifed in one of five categories using a Gingrich stocking chart.
