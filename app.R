@@ -1,7 +1,6 @@
 #import libraries####
 library(shiny)
 library(rsconnect)
-library(shinyWidgets)
 library(tidyverse)
 library(dplyr)
 library(readxl)
