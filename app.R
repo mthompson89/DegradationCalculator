@@ -1,4 +1,4 @@
-#import libraries####
+# import libraries ####
 library(shiny)
 library(rsconnect)
 library(shinyWidgets)
@@ -15,11 +15,31 @@ library(shinyjs)
 library(shinyBS)
 library(shinyalert)
 
+options(app_idle_timeout = 0, shiny.maxRequestSize = 3000*1024^2)
+# Load Data ####
 
+sg_ref <- as.data.frame(read_csv('sg_ref.csv'))
 
-options(app_idle_timeout = 0)
-#function builder####
-#functions for calculating stocking percentages
+primesp <- sg_ref %>%
+  filter(desirability == 1) %>% 
+  pull(cname,Gen_sp)
+
+secsp <- sg_ref %>%
+  filter(desirability == 2) %>% 
+  pull(cname,Gen_sp)
+
+tertsp <- sg_ref %>%
+  filter(desirability == 3) %>% 
+  pull(cname,Gen_sp)
+
+hwdf <- sg_ref %>% 
+  filter(HW_SW == "HW")
+
+swdf <- sg_ref %>% 
+  filter(HW_SW == 'SW')
+# function builder ####
+  ## functions for calculating stocking percentages ####
+
 C_lineBA <- function(DBH, SG){
   
   a = 0.00015# constants from Ducey&knapp 2010 relative density measure
@@ -51,7 +71,7 @@ A_lineBA <- function(DBH, SG){
   
 }
 
-# function to read in and calculate deg for a FVS output
+  ## function to read in and calculate deg for a FVS output ####
 fvs_calc <- function(data, prime,sec,tert){
   SG_ref <- vroom("SG_ref.csv", col_types = "ffnn")
   
@@ -100,54 +120,105 @@ fvs_calc <- function(data, prime,sec,tert){
     na.omit()
   return(dfStandRD_v2)
 }
+createhw_input_pair_ui <- function(hwspecies_name, hwsci_name) {
+  fluidRow(
+    style = "overflow-y:scroll; max-height: 400px; position:relative;",
+    column(6, align = "center",
+           h5(strong(hwspecies_name)),
+           h6(hwsci_name),
+           column(6, align = "right", numericInput(
+             inputId = hwsci_name,
+             label = "AGS",
+             value = 0,
+             min = 0,
+             width = validateCssUnit(200)
+           )),
+           column(6, align = "left", numericInput(
+             inputId = paste0(hwsci_name, "UGS",sep = ''),
+             label = "UGS",
+             value = 0,
+             min = 0,
+             width = validateCssUnit(200)
+           ))
+    )
+  )
+}
 
-sg_ref <- read_xlsx('SG_ref.xlsx',sheet = 2)
+createsw_input_pair_ui <- function(swspecies_name, swsci_name) {
+  fluidRow(
+    style = "overflow-y:scroll; max-height: 400px; position:relative;",
+    column(6, align = "center",
+           h5(strong(swspecies_name)),
+           h6(swsci_name),
+           column(6, align = "right", numericInput(
+             inputId = swsci_name,
+             label = "AGS",
+             value = 0,
+             min = 0,
+             width = validateCssUnit(200)
+           )),
+           column(6, align = "left", numericInput(
+             inputId = paste0(swsci_name, "UGS", sep = ''),
+             label = "UGS",
+             value = 0,
+             min = 0,
+             width = validateCssUnit(200)
+           ))
+    )
+  )
+}
 
-primesp <- sg_ref %>%
-  filter(desirability == 1) %>% 
-  pull(cname,Gen_sp)
+createhwslider_input_pair_ui <- function(hwspecies_name, hwsci_name) {
+  fluidRow(
+    style = "overflow-y:scroll; max-height: 400px; position:relative;",
+    column(6, align = "center",
+           h5(strong(hwspecies_name)),
+           h6(hwsci_name),
+           column(6, align = "right", numericInput(
+             inputId = hwsci_name,
+             label = "Basal Area Proportion",
+             value = 0,
+             min = 0,
+             max = 1,
+             width = validateCssUnit(200)
+           )),
+           column(6, align = "left", sliderInput(
+             inputId = paste0(hwsci_name, "AGS", sep = ''),
+             label = "Proportion AGS",
+             value = 0,
+             min = 0,
+             max = 1,
+             width = validateCssUnit(200)
+           ))
+    )
+  )
+}
 
-secsp <- sg_ref %>%
-  filter(desirability == 2) %>% 
-  pull(cname,Gen_sp)
-
-tertsp <- sg_ref %>%
-  filter(desirability == 3) %>% 
-  pull(cname,Gen_sp)
-#Define names for reference later ####
-# sp_Names <- c("Pinus resinosa","Pinus resinosa",
-#               "Acer saccharum","Acer saccharum",
-#               "Betula alleghaniensis","Betula alleghaniensis",
-#               "Betula payrifera", "Betula payrifera",
-#               "Pinus strobus","Pinus strobus",
-#               "Quercus rubra","Quercus rubra",
-#               "Prunus serotina","Prunus serotina",
-#               "Quercus alba","Quercus alba",
-#               "Acer rubrum","Acer rubrum",
-#               "Tsuga canadensis","Tsuga canadensis",
-#               "Thuja occidentalis","Thuja occidentalis",
-#               "Fraxinus americana","Fraxinus americana",
-#               "Picea mariana","Picea mariana",
-#               "Picea glauca","Picea glauca",
-#               "Betula lenta","Betula lenta",
-#               "abies Balsamea","abies Balsamea",
-#               "Fagus grandifolia","Fagus grandifolia",
-#               "Populus tremuloides","Populus tremuloides",
-#               "Betula populifolia","Betula populifolia",
-#               "Populus grandidentata","Populus grandidentata",
-#               "Populus balsamifera","Populus balsamifera",
-#               "Ulmus americana","Ulmus americana",
-#               "Picea rubens", "Picea rubens",
-#               "Larix laricina", "Larix laricina")
-# 
-# #specific gravity for each species, SG are doubled because of AGS and UGS calculation later
-# Sp_SG <- c(0.4,0.4,0.63,0.63,0.62,0.62,0.55,0.55,0.35,0.35,0.63,0.63,0.5,0.5,0.68,0.68,0.54,0.54,0.4,0.4,0.31,0.31,0.6,0.6,0.46,0.46,
-#            0.4,0.4, 0.4,0.4,0.65,0.65,0.35,0.35,0.64,0.64,0.38,0.38,0.51,0.51,0.39,0.39,0.34,0.34,0.5,0.5, 0.53,0.53)
-# 
-# #rename specific gravity  values to the appropriate species names
-# names(Sp_SG) <- sp_Names
-options(shiny.maxRequestSize = 3000*1024^2)
-
+createswslider_input_pair_ui <- function(swspecies_name, swsci_name) {
+  fluidRow(
+    style = "overflow-y:scroll; max-height: 400px; position:relative;",
+    column(6, align = "center",
+           h5(strong(swspecies_name)),
+           h6(swsci_name),
+           column(6, align = "right", numericInput(
+             inputId = swsci_name,
+             label = "Basal Area Proportion",
+             value = 0,
+             min = 0,
+             max = 1,
+             width = validateCssUnit(200)
+           )),
+           column(6, align = "left", sliderInput(
+             inputId = paste0(swsci_name, "AGS", sep = ''),
+             label = "Proportion AGS",
+             value = 0,
+             min = 0,
+             max = 1,
+             width = validateCssUnit(200)
+           ))
+    )
+  )
+}
 # Define UI #####
 shinyApp(
   ui = tagList(
@@ -188,78 +259,7 @@ shinyApp(
     navbarPage(
       theme = shinytheme("flatly"),  
       "Degradation Calculator",
-      #' tabPanel("testing", 
-      #'          sidebarPanel(
-      #'            tags$head(tags$style(type="text/css", "
-      #'                                    .loading {
-      #'                                         display: inline-block;
-      #'                                         overflow: hidden;
-      #'                                         height: 1.3em;
-      #'                                         margin-top: -0.3em;
-      #'                                         line-height: 1.5em;
-      #'                                         vertical-align: text-bottom;
-      #'                                         box-sizing: border-box;
-      #'                                         }
-      #'                                    .loading.dots::after {
-      #'                                       text-rendering: geometricPrecision;
-      #'                                        content: '.\\A..\\A...\\A....';
-      #'                                       animation: spin10 2s steps(10) infinite;
-      #'                                       animation-duration: 2s;
-      #'                                       animation-timing-function: steps(10);
-      #'                                       animation-delay: 0s;
-      #'                                       animation-iteration-count: infinite;
-      #'                                       animation-direction: normal;
-      #'                                       animation-fill-mode: none;
-      #'                                       animation-play-state: running;
-      #'                                       animation-name: spin10;
-      #'                                   }
-      #'                                   .loading::after {
-      #'                                       display: inline-table;
-      #'                                       white-space: pre;
-      #'                                       text-align: left;
-      #'                                   }
-      #'                                   @keyframes spin10 { to { transform: translateY(-15.0em); } }
-      #'                                   '
-      #'                                 ")),
-      #'            # paste("Select FVS file to upload. File must be no larger than 3Gb and must be a csv"),
-      #'            #input if a Basal area prism is going to be used or known basal area by species
-      #'            selectInput('BAInput','1. Prism Plot Data or Known Basal Area (sqft/acre) by Species?',
-      #'                        choices =  c('Prism Plot Data','Known Basal Area by Species','Basal Area percentage')),
-      #'            bsTooltip("BAInput", "Choose if you are entering 1. Data directly from a prism plot2. The known basal area (sqft/acre) by species in the stand3. The percent basal area of each species.",
-      #'                      "right", options = list(container = "body")),
-      #'            
-      #'            uiOutput('basalArea'),
-      #'            bsTooltip("basalArea", "Enter the basal area factor prism you are using to conduct the prism plot",
-      #'                      "right", options = list(container = "body")),
-      #'            
-      #'            uiOutput('basalArea2'),
-      #'            bsTooltip("basalArea2", "Enter the number of prism plots you conducted in the stand",
-      #'                      "right", options = list(container = "body")),
-      #'            
-      #'            uiOutput('totalBA'),
-      #'            bsTooltip("totalBA", "Enter the total basal area of the stand",
-      #'                      "right", options = list(container = "body")),
-      #'            
-      #'            #input wether stand avg dbh or stand class size will be used
-      #'            selectInput("dbhInput", "2. Select Stand Class Size or Mean DBH of Stand",
-      #'                        c("Stand Class Size","Mean DBH of Stand")),
-      #'            bsTooltip("dbhInput", "Choose whether you are going to use the average stand size class to calculate DBH or if you have calculated the mean DBH of the stand",
-      #'                      "right", options = list(container = "body")),
-      #'            uiOutput("ui"),
-      #'            uiOutput('KnownBANote'),
-      #'            uiOutput('TreeDataInputs'),
-      #'            
-      #'          ),
-      #'          mainPanel(
-      #'            conditionalPanel(condition="$('html').hasClass('shiny-busy')",
-      #'                             tags$div("Please Wait While App is Working", id = "UpdateAnimate", class = "loading dots")),
-      #'            
-      #'            # dataTableOutput("treelist_checker")
-      #'            dataTableOutput("FVS")
-      #'            
-      #'          )
-      #' ),
-      ### How To ####
+  ## How To ####
       tabPanel("How To",
                fluidRow(align = "center",
                         tags$div(
@@ -300,8 +300,9 @@ shinyApp(
                         )
                )
       ),
-      # Prism Plots #####
+  ## Prism Plots #####
       tabPanel("Plot Input",
+    ### Sidebar Panel ####
                sidebarPanel(
                  #input if a Basal area prism is going to be used or known basal area by species
                  selectInput('BAInput','1. Prism Plot Data or Known Basal Area (sqft/acre) by Species?',
@@ -328,23 +329,31 @@ shinyApp(
                            "right", options = list(container = "body")),
                  uiOutput("ui"),
                  uiOutput('KnownBANote'),
-                 uiOutput('TreeDataInputs'),
-                 #the main panel#####
+                 fluidPage(
+                   # style = "overflow-y:scroll; max-height: 400px; position:relative;",
+                           
+                           column(6, align = "center",
+                                  uiOutput("HWTrDtInputs")),
+                           column(6, align = "center",
+                                  uiOutput('SWTrDtInputs'))
+                 )
+    ### Main panel#####
                ),
                mainPanel(
                  fluidRow(style = "padding-left: 200px",align = "center",
-                           plotlyOutput("plot",width = 600, height = 700),
-                           # tableOutput("Testdf"),
-                          # textOutput("testtxt")
+                           plotlyOutput("plot",width = 600, height = 700)
+                           #tableOutput("Testdf"),
+                           #verbatimTextOutput("allInputs")
+                 
                  ),
                  fluidRow(style = "padding: 50px,50px,50px,50px", align = "center",
-                          htmlOutput("degValue"),
+                          htmlOutput("degValue")
                           
                  )
                  
                )
       ),
-      # FVS Outputs #####
+  ## FVS Outputs #####
       tabPanel("Tree List Input", 
                sidebarPanel(
                  tags$head(tags$style(type="text/css", "
@@ -395,9 +404,8 @@ shinyApp(
                  
                )
       ),
-      ## Tree Category Selector#####
+  ## Tree Category Selector#####
       tabPanel("Tree Category Selector",
-               # useShinyalert(slickROutput("slickR")),
                fluidRow(align = "center",
                         h3("Change species desirablity categories"),
                         h5("Click and drag species into prefered desirability boxes. To reset species, simply refresh app")
@@ -438,14 +446,13 @@ shinyApp(
                         )
                )
       )
-    ),
+    )
   ),
-  ### SERVER #####
+  
+# SERVER #####
   server = function(input, output) {
     
-    
-    
-    
+  ## reactive objects ####
     datasetInput <- reactive({
       file <- input$FVS_Sheet
       
@@ -466,6 +473,86 @@ shinyApp(
       tertiarySp <- input$tert
     })
     
+    hw_inputs <- reactive({
+      # Apply the function to each row of the dataframe to create input pairs
+      inputhw_pairs_ui <- lapply(1:nrow(hwdf), function(i) {
+        createhw_input_pair_ui(hwdf$cname[i], hwdf$Gen_sp[i])
+      })
+      
+      # Combine input pairs into a single UI element
+      do.call(tagList, inputhw_pairs_ui)
+    })
+    
+    sw_inputs <- reactive({
+      # Apply the function to each row of the dataframe to create input pairs
+      inputsw_pairs_ui <- lapply(1:nrow(swdf), function(i) {
+        createsw_input_pair_ui(swdf$cname[i], swdf$Gen_sp[i])
+      })
+      
+      # Combine input pairs into a single UI element
+      do.call(tagList, inputsw_pairs_ui)
+    })
+    
+    perhw_inputs <- reactive({
+      # Apply the function to each row of the dataframe to create input pairs
+      inputhw_pairs_ui <- lapply(1:nrow(hwdf), function(i) {
+        createhwslider_input_pair_ui(hwdf$cname[i], hwdf$Gen_sp[i])
+      })
+      
+      # Combine input pairs into a single UI element
+      do.call(tagList, inputhw_pairs_ui)
+    })
+    
+    persw_inputs <- reactive({
+      # Apply the function to each row of the dataframe to create input pairs
+      inputsw_pairs_ui <- lapply(1:nrow(swdf), function(i) {
+        createswslider_input_pair_ui(swdf$cname[i], swdf$Gen_sp[i])
+      })
+      
+      # Combine input pairs into a single UI element
+      do.call(tagList, inputsw_pairs_ui)
+    })
+    
+    SpeciesDataInput <- reactive({
+      
+      # sg_ref <- read_xlsx('SG_ref.xlsx',sheet = 2)
+      # data.frame(sp = sg_ref %>% pull(Gen_sp))
+      splist <- sg_ref %>% pull(Gen_sp)
+      # Use lapply to iterate over the input IDs
+      data_list <- lapply(splist, function(id) {
+        # Check if the input has a non-null value
+        if (!is.null(input[[id]])){
+          # If value is not null, return a dataframe row
+          data.frame(Gen_sp = id, AGSValue = input[[id]],
+                     UGSValue = ifelse(input$BAInput != 'Basal Area percentage',
+                                       input[[paste(id,'UGS',sep = "")]],
+                                       (1-input[[paste(id,'AGS',sep = '')]])*input[[id]]),
+                     AGSProp = ifelse(input$BAInput == 'Basal Area percentage',
+                                      input[[id]]*input[[paste(id,"AGS",sep = '')]],
+                                      0))
+        } else {
+          # If value is null, return NULL
+          NULL
+        }
+      })
+      
+      # Use Filter to remove NULL entries
+      data <- do.call(rbind, Filter(function(x) !is.null(x), data_list)) 
+      
+      data <- data %>% 
+        mutate(AGSBA = case_when(input$BAInput == 'Prism Plot Data'~ (AGSValue*input$BAF)/input$Nsweeps,
+                                 input$BAInput == 'Basal Area percentage'~ AGSProp*input$totBA,
+                                 TRUE~AGSValue),
+               UGSBA = case_when(input$BAInput == 'Prism Plot Data'~ (UGSValue*input$BAF)/input$Nsweeps,
+                                 input$BAInput == 'Basal Area percentage'~ UGSValue*input$totBA,
+                                 TRUE~UGSValue),
+               TOTBA = AGSBA+UGSBA) %>% 
+        filter(AGSValue!=0) %>% 
+        left_join(sg_ref,by = join_by(Gen_sp))
+      
+      return(data)
+    })
+  ## renderUI inputs ####
     output$basalArea <- renderUI({
       if (is.null(input$BAInput))
         return()
@@ -543,440 +630,416 @@ shinyApp(
                                                           'Small Sawtimber (9-13")',
                                                           'Large Sawtimber (>13")')),
              
-             "Mean DBH of Stand" =  numericInput("exactDBH","2a. Mean DBH of Stand", 0),
+             "Mean DBH of Stand" =  numericInput("exactDBH","2a. Mean DBH of Stand", 0)
              
       )
     })
     
-    
-    
-  output$TreeDataInputs <- renderUI({
-    if (is.null(input$BAInput))
-      return()
-    
-    switch(input$BAInput,
-           ### prism Tree sp. Inputs ######
-           "Prism Plot Data" = fluidRow(style = "overflow-y:scroll; max-height: 400px; position:relative;",
-                                        column(6, align = "center",
-                                               h5(strong("American Beech")),
-                                               h6("(Fagus grandifolia)"),
-                                               column(6,align = "right",numericInput("Fagus_grandifolia", "AGS", 0, min = 0,width = validateCssUnit(100))),
-                                               column(6,align = "left",numericInput("Fagus_grandifoliaUGS", "UGS", 0, min = 0,width = validateCssUnit(100))),
-                                               
-                                               h5(strong("American Elm")),
-                                               h6("(Ulmus americana)"),
-                                               column(6,align = "right",numericInput("Ulmus_americana", "AGS", 0, min = 0, width = validateCssUnit(100))),
-                                               column(6,align = "left",numericInput("Ulmus_americanaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                               
-                                               h5(strong("Balsam Poplar")),
-                                               h6("(Populus balsamifera)"),
-                                               column(6,align = "right", numericInput("Populus_balsamifera", "AGS", 0, min = 0, width = validateCssUnit(100))),
-                                               column(6,align = "left",numericInput("Populus_balsamiferaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                               
-                                               h5(strong("Bigtooth Aspen")),
-                                               h6("(Populus grandidentata)"),
-                                               column(6,align = "right",numericInput("Populus_grandidentata", "AGS", 0, min = 0, width = validateCssUnit(100))),
-                                               column(6,align = "left",numericInput("Populus_grandidentataUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                               
-                                               h5(strong("Black Birch")),
-                                               h6("(Betula lenta)"),
-                                               column(6,align = "right", numericInput("Betula_lenta", "AGS", 0, min = 0, width = validateCssUnit(100))),
-                                               column(6,align = "left",numericInput("Betula_lentaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                               
-                                               h5(strong("Black Cherry")),
-                                               h6("(Prunus serotina)"),
-                                               column(6,align = "right",numericInput("Prunus_serotina", "AGS", 0, min = 0, width = validateCssUnit(100))),
-                                               column(6,align = "left",numericInput("Prunus_serotinaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                               
-                                               h5(strong("Grey Birch")),
-                                               h6("(Betual populifolia)"),
-                                               column(6,align = "right",numericInput("Betula_populifolia", "AGS", 0, min = 0, width = validateCssUnit(100))),
-                                               column(6,align = "left",numericInput("Betula_populifoliaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                               
-                                               h5(strong("Quaking Aspen")),
-                                               h6("(Populaus tremuloides)"),
-                                               column(6,align = "right",numericInput("Populus_tremuloides", "AGS", 0, min = 0, width = validateCssUnit(100))),
-                                               column(6,align = "left",numericInput("Populus_tremuloidesUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                               
-                                               h5(strong("Red Maple")),
-                                               h6("(Acer rubrum)"),
-                                               column(6,align = "right",numericInput("Acer_rubrum", "AGS", 0, min = 0, width = validateCssUnit(100))),
-                                               column(6,align = "left",numericInput("Acer_rubrumUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                               
-                                               h5(strong("Red Oak")),
-                                               h6("(Quercus rubra)"),
-                                               column(6,align = "right",numericInput("Quercus_rubra", "AGS", 0, min = 0, width = validateCssUnit(100))),
-                                               column(6,align = "left",numericInput("Quercus_rubraUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                               
-                                               h5(strong("Sugar Maple")),
-                                               h6("(Acer saccharum)"),
-                                               column(6,align = "right",numericInput("Acer_saccharum", "AGS", 0, min = 0, width =  validateCssUnit(100))),
-                                               column(6,align = "left",numericInput("Acer_saccharumUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                               
-                                               h5(strong("White Ash")),
-                                               h6("(Fraxinus americana)"),
-                                               column(6,align = "right",numericInput("Fraxinus_americana", "AGS", 0, min = 0, width = validateCssUnit(100))),
-                                               column(6,align = "left",numericInput("Fraxinus_americanaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                               
-                                               h5(strong("White Birch")),
-                                               h6("(Betula papyrifera)"),
-                                               column(6,align = "right",numericInput("Betula_papyrifera", "AGS", 0, min = 0, width = validateCssUnit(100))),
-                                               column(6,align = "left",numericInput("Betula_papyriferaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                               
-                                               h5(strong("White Oak")),
-                                               h6("(Quercus alba)"),
-                                               column(6,align = "right",numericInput("Quercus_alba", "AGS", 0, min = 0, width = validateCssUnit(100))),
-                                               column(6,align = "left",numericInput("Quercus_albaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                               
-                                               h5(strong("Yellow Birch")),
-                                               h6("(Betula alleghaniensis)"),
-                                               column(6,align = "right",numericInput("Betula_alleghaniensis", "AGS", 0, min = 0, width = validateCssUnit(100))),
-                                               column(6,align = "left",numericInput("Betula_alleghaniensisUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                        ),
-                                        column(6, align = "center",
-                                               h5(strong("Arborvitae")),
-                                               h6("(Thuja occidentailis)"),
-                                               column(6,align = "right",numericInput("Thuja_occidentalis", "AGS", 0, min = 0, width = validateCssUnit(100))),
-                                               column(6,align = "left",numericInput("Thuja_occidentalisUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                               
-                                               h5(strong("Balsam Fir")),
-                                               h6("(Abies balsamea)"),
-                                               column(6,align = "right",numericInput("Abies_balsamea", "AGS", 0, min = 0, width = validateCssUnit(100))),
-                                               column(6,align = "left",numericInput("Abies_balsameaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                               
-                                               h5(strong("Black Spruce")),
-                                               h6("(Picea Mariana)"),
-                                               column(6,align = "right",numericInput("Picea_mariana", "AGS", 0, min = 0, width = validateCssUnit(100))),
-                                               column(6,align = "left",numericInput("Picea_marianaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                               
-                                               h5(strong("Eastern Hemlock")),
-                                               h6("(Tsuga canadensis)"),
-                                               column(6,align = "right",numericInput("Tsuga_canadensis", "AGS", 0, min = 0, width = validateCssUnit(100))),
-                                               column(6,align = "left",numericInput("Tsuga_canadensisUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                               
-                                               h5(strong("Eastern Tamarack")),
-                                               h6("(Larix laricina)"),
-                                               column(6,align = "right",numericInput("Larix_laricina", "AGS", 0, min = 0, width = validateCssUnit(100))),
-                                               column(6,align = "left",numericInput("Larix_laricinaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                               
-                                               h5(strong("Red Pine")),
-                                               h6("(Pinus resinosa)"),
-                                               column(6,align = "right",numericInput("Pinus_resinosa", "AGS", 0, min = 0, width = validateCssUnit(150))),
-                                               column(6,align = "left",numericInput("Pinus_resinosaUGS", "UGS", 0, min = 0, width =  validateCssUnit(150))),
-                                               
-                                               h5(strong("Red Spruce")),
-                                               h6("(Picea rubens)"),
-                                               column(6,align = "right",numericInput("Picea_rubens", "AGS", 0, min = 0, width = validateCssUnit(100))),
-                                               column(6,align = "left",numericInput("Picea_rubensUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                               
-                                               h5(strong("White Pine")),
-                                               h6("(Pinus strobus)"),
-                                               column(6,align = "right",numericInput("Pinus_strobus", "AGS", 0, min = 0, width = validateCssUnit(100))),
-                                               column(6,align = "left",numericInput("Pinus_strobusUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                               
-                                               h5(strong("White Spruce")),
-                                               h6("(Picea glauca)"),
-                                               column(6,align = "right",numericInput("Picea_glauca", "AGS", 0, min = 0, width = validateCssUnit(100))),
-                                               column(6,align = "left",numericInput("Picea_glaucaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                               
-                                               
-                                        )
-           ),
-           ### Known BATree sp. Inputs ######
-           "Known Basal Area by Species" =  fluidRow(style = "overflow-y:scroll; max-height: 400px; position:relative;",
-                                                     column(6, align = "center",
-                                                            h5(strong("American Beech")),
-                                                            h6("(Fagus grandifolia)"),
-                                                            column(6,align = "right",numericInput("Fagus_grandifolia", "AGS", 0, min = 0,width = validateCssUnit(100))),
-                                                            column(6,align = "left",numericInput("Fagus_grandifoliaUGS", "UGS", 0, min = 0,width = validateCssUnit(100))),
-                                                            
-                                                            h5(strong("American Elm")),
-                                                            h6("(Ulmus americana)"),
-                                                            column(6,align = "right",numericInput("Ulmus_americana", "AGS", 0, min = 0, width = validateCssUnit(100))),
-                                                            column(6,align = "left",numericInput("Ulmus_americanaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                                            
-                                                            h5(strong("Balsam Poplar")),
-                                                            h6("(Populus balsamifera)"),
-                                                            column(6,align = "right", numericInput("Populus_balsamifera", "AGS", 0, min = 0, width = validateCssUnit(100))),
-                                                            column(6,align = "left",numericInput("Populus_balsamiferaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                                            
-                                                            h5(strong("Bigtooth Aspen")),
-                                                            h6("(Populus grandidentata)"),
-                                                            column(6,align = "right",numericInput("Populus_grandidentata", "AGS", 0, min = 0, width = validateCssUnit(100))),
-                                                            column(6,align = "left",numericInput("Populus_grandidentataUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                                            
-                                                            h5(strong("Black Birch")),
-                                                            h6("(Betula lenta)"),
-                                                            column(6,align = "right", numericInput("Betula_lenta", "AGS", 0, min = 0, width = validateCssUnit(100))),
-                                                            column(6,align = "left",numericInput("Betula_lentaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                                            
-                                                            h5(strong("Black Cherry")),
-                                                            h6("(Prunus serotina)"),
-                                                            column(6,align = "right",numericInput("Prunus_serotina", "AGS", 0, min = 0, width = validateCssUnit(100))),
-                                                            column(6,align = "left",numericInput("Prunus_serotinaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                                            
-                                                            h5(strong("Grey Birch")),
-                                                            h6("(Betual populifolia)"),
-                                                            column(6,align = "right",numericInput("Betula_populifolia", "AGS", 0, min = 0, width = validateCssUnit(100))),
-                                                            column(6,align = "left",numericInput("Betula_populifoliaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                                            
-                                                            h5(strong("Quaking Aspen")),
-                                                            h6("(Populaus tremuloides)"),
-                                                            column(6,align = "right",numericInput("Populus_tremuloides", "AGS", 0, min = 0, width = validateCssUnit(100))),
-                                                            column(6,align = "left",numericInput("Populus_tremuloidesUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                                            
-                                                            h5(strong("Red Maple")),
-                                                            h6("(Acer rubrum)"),
-                                                            column(6,align = "right",numericInput("Acer_rubrum", "AGS", 0, min = 0, width = validateCssUnit(100))),
-                                                            column(6,align = "left",numericInput("Acer_rubrumUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                                            
-                                                            h5(strong("Red Oak")),
-                                                            h6("(Quercus rubra)"),
-                                                            column(6,align = "right",numericInput("Quercus_rubra", "AGS", 0, min = 0, width = validateCssUnit(100))),
-                                                            column(6,align = "left",numericInput("Quercus_rubraUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                                            
-                                                            h5(strong("Sugar Maple")),
-                                                            h6("(Acer saccharum)"),
-                                                            column(6,align = "right",numericInput("Acer_saccharum", "AGS", 0, min = 0, width =  validateCssUnit(100))),
-                                                            column(6,align = "left",numericInput("Acer_saccharumUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                                            
-                                                            h5(strong("White Ash")),
-                                                            h6("(Fraxinus americana)"),
-                                                            column(6,align = "right",numericInput("Fraxinus_americana", "AGS", 0, min = 0, width = validateCssUnit(100))),
-                                                            column(6,align = "left",numericInput("Fraxinus_americanaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                                            
-                                                            h5(strong("White Birch")),
-                                                            h6("(Betula papyrifera)"),
-                                                            column(6,align = "right",numericInput("Betula_papyrifera", "AGS", 0, min = 0, width = validateCssUnit(100))),
-                                                            column(6,align = "left",numericInput("Betula_papyriferaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                                            
-                                                            h5(strong("White Oak")),
-                                                            h6("(Quercus alba)"),
-                                                            column(6,align = "right",numericInput("Quercus_alba", "AGS", 0, min = 0, width = validateCssUnit(100))),
-                                                            column(6,align = "left",numericInput("Quercus_albaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                                            
-                                                            h5(strong("Yellow Birch")),
-                                                            h6("(Betula alleghaniensis)"),
-                                                            column(6,align = "right",numericInput("Betula_alleghaniensis", "AGS", 0, min = 0, width = validateCssUnit(100))),
-                                                            column(6,align = "left",numericInput("Betula_alleghaniensisUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                                     ),
-                                                     column(6, align = "center",
-                                                            h5(strong("Arborvitae")),
-                                                            h6("(Thuja occidentailis)"),
-                                                            column(6,align = "right",numericInput("Thuja_occidentalis", "AGS", 0, min = 0, width = validateCssUnit(100))),
-                                                            column(6,align = "left",numericInput("Thuja_occidentalisUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                                            
-                                                            h5(strong("Balsam Fir")),
-                                                            h6("(Abies balsamea)"),
-                                                            column(6,align = "right",numericInput("Abies_balsamea", "AGS", 0, min = 0, width = validateCssUnit(100))),
-                                                            column(6,align = "left",numericInput("Abies_balsameaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                                            
-                                                            h5(strong("Black Spruce")),
-                                                            h6("(Picea Mariana)"),
-                                                            column(6,align = "right",numericInput("Picea_mariana", "AGS", 0, min = 0, width = validateCssUnit(100))),
-                                                            column(6,align = "left",numericInput("Picea_marianaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                                            
-                                                            h5(strong("Eastern Hemlock")),
-                                                            h6("(Tsuga canadensis)"),
-                                                            column(6,align = "right",numericInput("Tsuga_canadensis", "AGS", 0, min = 0, width = validateCssUnit(100))),
-                                                            column(6,align = "left",numericInput("Tsuga_canadensisUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                                            
-                                                            h5(strong("Eastern Tamarack")),
-                                                            h6("(Larix laricina)"),
-                                                            column(6,align = "right",numericInput("Larix_laricina", "AGS", 0, min = 0, width = validateCssUnit(100))),
-                                                            column(6,align = "left",numericInput("Larix_laricinaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                                            
-                                                            h5(strong("Red Pine")),
-                                                            h6("(Pinus resinosa)"),
-                                                            column(6,align = "right",numericInput("Pinus_resinosa", "AGS", 0, min = 0, width = validateCssUnit(150))),
-                                                            column(6,align = "left",numericInput("Pinus_resinosaUGS", "UGS", 0, min = 0, width =  validateCssUnit(150))),
-                                                            
-                                                            h5(strong("Red Spruce")),
-                                                            h6("(Picea rubens)"),
-                                                            column(6,align = "right",numericInput("Picea_rubens", "AGS", 0, min = 0, width = validateCssUnit(100))),
-                                                            column(6,align = "left",numericInput("Picea_rubensUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                                            
-                                                            h5(strong("White Pine")),
-                                                            h6("(Pinus strobus)"),
-                                                            column(6,align = "right",numericInput("Pinus_strobus", "AGS", 0, min = 0, width = validateCssUnit(100))),
-                                                            column(6,align = "left",numericInput("Pinus_strobusUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                                            
-                                                            h5(strong("White Spruce")),
-                                                            h6("(Picea glauca)"),
-                                                            column(6,align = "right",numericInput("Picea_glauca", "AGS", 0, min = 0, width = validateCssUnit(100))),
-                                                            column(6,align = "left",numericInput("Picea_glaucaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
-                                                            
-                                                            
-                                                     )
-           ),
-           ###BA perc Tree sp. Inputs ######
-           'Basal Area percentage' =  fluidRow(style = "overflow-y:scroll; max-height: 400px; position:relative;",
-                                               column(6, align = "center",
-                                                      h5(strong("American Beech")),
-                                                      h6("(Fagus grandifolia)"),
-                                                      column(6,align = "right",numericInput("Fagus_grandifolia", "BA percentage", 0, min = 0, max = 1)),
-                                                      column(6,align = "left", sliderInput("Fagus_grandifoliaAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
-                                                      
-                                                      h5(strong("American Elm")),
-                                                      h6("(Ulmus americana)"),
-                                                      column(6,align = "right",numericInput("Ulmus_americana", "BA percentage", 0, min = 0, max = 1)),
-                                                      column(6,align = "left",sliderInput("Ulmus_americanaAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
-                                                      
-                                                      h5(strong("Balsam Poplar")),
-                                                      h6("(Populus balsamifera)"),
-                                                      column(6,align = "right", numericInput("Populus_balsamifera", "BA percentage", 0, min = 0, max = 1)),
-                                                      column(6,align = "left",sliderInput("Populus_balsamiferaAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
-                                                      
-                                                      h5(strong("Bigtooth Aspen")),
-                                                      h6("(Populus grandidentata)"),
-                                                      column(6,align = "right",numericInput("Populus_grandidentata", "BA percentage", 0, min = 0, max = 1)),
-                                                      column(6,align = "left",sliderInput("Populus_grandidentataAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
-                                                      
-                                                      h5(strong("Black Birch")),
-                                                      h6("(Betula lenta)"),
-                                                      column(6,align = "right", numericInput("Betula_lenta", "BA percentage", 0, min = 0, max = 1)),
-                                                      column(6,align = "left",sliderInput("Betula_lentaAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
-                                                      
-                                                      h5(strong("Black Cherry")),
-                                                      h6("(Prunus serotina)"),
-                                                      column(6,align = "right",numericInput("Prunus_serotina", "BA percentage", 0, min = 0, max = 1)),
-                                                      column(6,align = "left",sliderInput("Prunus_serotinaAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
-                                                      
-                                                      h5(strong("Grey Birch")),
-                                                      h6("(Betual populifolia)"),
-                                                      column(6,align = "right",numericInput("Betula_populifolia", "BA percentage", 0, min = 0, max = 1)),
-                                                      column(6,align = "left",sliderInput("Betula_populifoliaAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
-                                                      
-                                                      h5(strong("Quaking Aspen")),
-                                                      h6("(Populaus tremuloides)"),
-                                                      column(6,align = "right",numericInput("Populus_tremuloides", "BA percentage", 0, min = 0, max = 1)),
-                                                      column(6,align = "left",sliderInput("Populus_tremuloidesAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
-                                                      
-                                                      h5(strong("Red Maple")),
-                                                      h6("(Acer rubrum)"),
-                                                      column(6,align = "right",numericInput("Acer_rubrum", "BA percentage", 0, min = 0, max = 1)),
-                                                      column(6,align = "left",sliderInput("Acer_rubrumAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
-                                                      
-                                                      h5(strong("Red Oak")),
-                                                      h6("(Quercus rubra)"),
-                                                      column(6,align = "right",numericInput("Quercus_rubra", "BA percentage", 0, min = 0, max = 1)),
-                                                      column(6,align = "left",sliderInput("Quercus_rubraAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
-                                                      
-                                                      h5(strong("Sugar Maple")),
-                                                      h6("(Acer saccharum)"),
-                                                      column(6,align = "right",numericInput("Acer_saccharum", "BA percentage", 0, min = 0, max = 1)),
-                                                      column(6,align = "left",sliderInput("Acer_saccharumAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
-                                                      
-                                                      h5(strong("White Ash")),
-                                                      h6("(Fraxinus americana)"),
-                                                      column(6,align = "right",numericInput("Fraxinus_americana", "BA percentage", 0, min = 0, max = 1)),
-                                                      column(6,align = "left",sliderInput("Fraxinus_americanaAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
-                                                      
-                                                      h5(strong("White Birch")),
-                                                      h6("(Betula papyrifera)"),
-                                                      column(6,align = "right",numericInput("Betula_papyrifera", "BA percentage", 0, min = 0, max = 1)),
-                                                      column(6,align = "left",sliderInput("Betula_papyriferaAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
-                                                      
-                                                      h5(strong("White Oak")),
-                                                      h6("(Quercus alba)"),
-                                                      column(6,align = "right",numericInput("Quercus_alba", "BA percentage", 0, min = 0, max = 1)),
-                                                      column(6,align = "left",sliderInput("Quercus_albaAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
-                                                      
-                                                      h5(strong("Yellow Birch")),
-                                                      h6("(Betula alleghaniensis)"),
-                                                      column(6,align = "right",numericInput("Betula_alleghaniensis", "BA percentage", 0, min = 0, max = 1)),
-                                                      column(6,align = "left",sliderInput("Betula_alleghaniensisAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
-                                               ),
-                                               column(6, align = "center",
-                                                      h5(strong("Arborvitae")),
-                                                      h6("(Thuja occidentailis)"),
-                                                      column(6,align = "right",numericInput("Thuja_occidentalis", "BA percentage", 0, min = 0, max = 1)),
-                                                      column(6,align = "left",sliderInput("Thuja_occidentalisAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
-                                                      
-                                                      h5(strong("Balsam Fir")),
-                                                      h6("(Abies balsamea)"),
-                                                      column(6,align = "right",numericInput("Abies_balsamea", "BA percentage", 0, min = 0, max = 1)),
-                                                      column(6,align = "left",sliderInput("Abies_balsameaAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
-                                                      
-                                                      h5(strong("Black Spruce")),
-                                                      h6("(Picea Mariana)"),
-                                                      column(6,align = "right",numericInput("Picea_mariana", "BA percentage", 0, min = 0, max = 1)),
-                                                      column(6,align = "left",sliderInput("Picea_marianaAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
-                                                      
-                                                      h5(strong("Eastern Hemlock")),
-                                                      h6("(Tsuga canadensis)"),
-                                                      column(6,align = "right",numericInput("Tsuga_canadensis", "BA percentage", 0, min = 0, max = 1)),
-                                                      column(6,align = "left",sliderInput("Tsuga_canadensisAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
-                                                      
-                                                      h5(strong("Eastern Tamarack")),
-                                                      h6("(Larix laricina)"),
-                                                      column(6,align = "right",numericInput("Larix_laricina", "BA percentage", 0, min = 0, max = 1)),
-                                                      column(6,align = "left",sliderInput("Larix_laricinaAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
-                                                      
-                                                      h5(strong("Red Pine")),
-                                                      h6("(Pinus resinosa)"),
-                                                      column(6,align = "right",numericInput("Pinus_resinosa", "BA percentage", 0, min = 0, max = 1)),
-                                                      column(6,align = "left",sliderInput("Pinus_resinosaAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1))),
-                                                      
-                                                      h5(strong("Red Spruce")),
-                                                      h6("(Picea rubens)"),
-                                                      column(6,align = "right",numericInput("Picea_rubens", "BA percentage", 0, min = 0, max = 1)),
-                                                      column(6,align = "left",sliderInput("Picea_rubensAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
-                                                      
-                                                      h5(strong("White Pine")),
-                                                      h6("(Pinus strobus)"),
-                                                      column(6,align = "right",numericInput("Pinus_strobus", "BA percentage", 0, min = 0, max = 1)),
-                                                      column(6,align = "left",sliderInput("Pinus_strobusAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
-                                                      
-                                                      h5(strong("White Spruce")),
-                                                      h6("(Picea glauca)"),
-                                                      column(6,align = "right",numericInput("Picea_glauca", "BA percentage", 0, min = 0,max = 1)),
-                                                      column(6,align = "left",sliderInput("Picea_glaucaAGS", "percentAGS", 0, min = 0,max = 1, step = 0.1))
-                                               )
-           )
-  })  
-  
-  
-  SpeciesDataInput <- reactive({
-    
-    # sg_ref <- read_xlsx('SG_ref.xlsx',sheet = 2)
-    # data.frame(sp = sg_ref %>% pull(Gen_sp))
-    splist <- sg_ref %>% pull(Gen_sp)
-    # Use lapply to iterate over the input IDs
-    data_list <- lapply(splist, function(id) {
-      # Check if the input has a non-null value
-      if (!is.null(input[[id]])){
-        # If value is not null, return a dataframe row
-        data.frame(Gen_sp = id, AGSValue = input[[id]],
-                   UGSValue = ifelse(input$BAInput != 'Basal Area percentage',
-                                     input[[paste(id,'UGS',sep = "")]],
-                                     (1-input[[paste(id,'AGS',sep = '')]])*input[[id]]),
-                   AGSProp = ifelse(input$BAInput == 'Basal Area percentage',
-                                    input[[id]]*input[[paste(id,"AGS",sep = '')]],
-                                    0))
-      } else {
-        # If value is null, return NULL
-        NULL
-      }
+
+    output$HWTrDtInputs <- renderUI({
+      if (is.null(input$BAInput))
+        return()
+      
+      switch(input$BAInput,
+             "Prism Plot Data" = hw_inputs(),
+             "Known Basal Area by Species" = hw_inputs(),
+             'Basal Area percentage' = perhw_inputs()
+      )
     })
-    
-    # Use Filter to remove NULL entries
-    data <- do.call(rbind, Filter(function(x) !is.null(x), data_list)) 
-    
-    data <- data %>% 
-      mutate(AGSBA = case_when(input$BAInput == 'Prism Plot Data'~ (AGSValue*input$BAF)/input$Nsweeps,
-                               input$BAInput == 'Basal Area percentage'~ AGSProp*input$totBA,
-                               TRUE~AGSValue),
-             UGSBA = case_when(input$BAInput == 'Prism Plot Data'~ (UGSValue*input$BAF)/input$Nsweeps,
-                               input$BAInput == 'Basal Area percentage'~ UGSValue*input$totBA,
-                               TRUE~UGSValue),
-             TOTBA = AGSBA+UGSBA) %>% 
-      filter(AGSValue!=0) %>% 
-      left_join(sg_ref,by = join_by(Gen_sp))
-    
-    return(data)
-  })
-       #####       
+    output$SWTrDtInputs <- renderUI({
+      if (is.null(input$BAInput))
+        return()
+      
+      switch(input$BAInput,
+             "Prism Plot Data" = sw_inputs(),
+             "Known Basal Area by Species" = sw_inputs(),
+             'Basal Area percentage' = persw_inputs()
+      )
+    })
+  
+  
+  ### prism Tree sp. Inputs ######
+  # "Prism Plot Data" = fluidRow(style = "overflow-y:scroll; max-height: 400px; position:relative;",
+  #                              column(6, align = "center",
+  #                                     h5(strong("American Beech")),
+  #                                     h6("(Fagus grandifolia)"),
+  #                                     column(6,align = "right",numericInput("Fagus_grandifolia", "AGS", 0, min = 0,width = validateCssUnit(100))),
+  #                                     column(6,align = "left",numericInput("Fagus_grandifoliaUGS", "UGS", 0, min = 0,width = validateCssUnit(100))),
+  #                                     
+  #                                     h5(strong("American Elm")),
+  #                                     h6("(Ulmus americana)"),
+  #                                     column(6,align = "right",numericInput("Ulmus_americana", "AGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                     column(6,align = "left",numericInput("Ulmus_americanaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                     
+  #                                     h5(strong("Balsam Poplar")),
+  #                                     h6("(Populus balsamifera)"),
+  #                                     column(6,align = "right", numericInput("Populus_balsamifera", "AGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                     column(6,align = "left",numericInput("Populus_balsamiferaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                     
+  #                                     h5(strong("Bigtooth Aspen")),
+  #                                     h6("(Populus grandidentata)"),
+  #                                     column(6,align = "right",numericInput("Populus_grandidentata", "AGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                     column(6,align = "left",numericInput("Populus_grandidentataUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                     
+  #                                     h5(strong("Black Birch")),
+  #                                     h6("(Betula lenta)"),
+  #                                     column(6,align = "right", numericInput("Betula_lenta", "AGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                     column(6,align = "left",numericInput("Betula_lentaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                     
+  #                                     h5(strong("Black Cherry")),
+  #                                     h6("(Prunus serotina)"),
+  #                                     column(6,align = "right",numericInput("Prunus_serotina", "AGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                     column(6,align = "left",numericInput("Prunus_serotinaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                     
+  #                                     h5(strong("Grey Birch")),
+  #                                     h6("(Betual populifolia)"),
+  #                                     column(6,align = "right",numericInput("Betula_populifolia", "AGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                     column(6,align = "left",numericInput("Betula_populifoliaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                     
+  #                                     h5(strong("Quaking Aspen")),
+  #                                     h6("(Populaus tremuloides)"),
+  #                                     column(6,align = "right",numericInput("Populus_tremuloides", "AGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                     column(6,align = "left",numericInput("Populus_tremuloidesUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                     
+  #                                     h5(strong("Red Maple")),
+  #                                     h6("(Acer rubrum)"),
+  #                                     column(6,align = "right",numericInput("Acer_rubrum", "AGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                     column(6,align = "left",numericInput("Acer_rubrumUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                     
+  #                                     h5(strong("Red Oak")),
+  #                                     h6("(Quercus rubra)"),
+  #                                     column(6,align = "right",numericInput("Quercus_rubra", "AGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                     column(6,align = "left",numericInput("Quercus_rubraUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                     
+  #                                     h5(strong("Sugar Maple")),
+  #                                     h6("(Acer saccharum)"),
+  #                                     column(6,align = "right",numericInput("Acer_saccharum", "AGS", 0, min = 0, width =  validateCssUnit(100))),
+  #                                     column(6,align = "left",numericInput("Acer_saccharumUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                     
+  #                                     h5(strong("White Ash")),
+  #                                     h6("(Fraxinus americana)"),
+  #                                     column(6,align = "right",numericInput("Fraxinus_americana", "AGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                     column(6,align = "left",numericInput("Fraxinus_americanaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                     
+  #                                     h5(strong("White Birch")),
+  #                                     h6("(Betula papyrifera)"),
+  #                                     column(6,align = "right",numericInput("Betula_papyrifera", "AGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                     column(6,align = "left",numericInput("Betula_papyriferaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                     
+  #                                     h5(strong("White Oak")),
+  #                                     h6("(Quercus alba)"),
+  #                                     column(6,align = "right",numericInput("Quercus_alba", "AGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                     column(6,align = "left",numericInput("Quercus_albaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                     
+  #                                     h5(strong("Yellow Birch")),
+  #                                     h6("(Betula alleghaniensis)"),
+  #                                     column(6,align = "right",numericInput("Betula_alleghaniensis", "AGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                     column(6,align = "left",numericInput("Betula_alleghaniensisUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                              ),
+  #                              column(6, align = "center",
+  #                                     h5(strong("Arborvitae")),
+  #                                     h6("(Thuja occidentailis)"),
+  #                                     column(6,align = "right",numericInput("Thuja_occidentalis", "AGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                     column(6,align = "left",numericInput("Thuja_occidentalisUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                     
+  #                                     h5(strong("Balsam Fir")),
+  #                                     h6("(Abies balsamea)"),
+  #                                     column(6,align = "right",numericInput("Abies_balsamea", "AGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                     column(6,align = "left",numericInput("Abies_balsameaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                     
+  #                                     h5(strong("Black Spruce")),
+  #                                     h6("(Picea Mariana)"),
+  #                                     column(6,align = "right",numericInput("Picea_mariana", "AGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                     column(6,align = "left",numericInput("Picea_marianaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                     
+  #                                     h5(strong("Eastern Hemlock")),
+  #                                     h6("(Tsuga canadensis)"),
+  #                                     column(6,align = "right",numericInput("Tsuga_canadensis", "AGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                     column(6,align = "left",numericInput("Tsuga_canadensisUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                     
+  #                                     h5(strong("Eastern Tamarack")),
+  #                                     h6("(Larix laricina)"),
+  #                                     column(6,align = "right",numericInput("Larix_laricina", "AGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                     column(6,align = "left",numericInput("Larix_laricinaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                     
+  #                                     h5(strong("Red Pine")),
+  #                                     h6("(Pinus resinosa)"),
+  #                                     column(6,align = "right",numericInput("Pinus_resinosa", "AGS", 0, min = 0, width = validateCssUnit(150))),
+  #                                     column(6,align = "left",numericInput("Pinus_resinosaUGS", "UGS", 0, min = 0, width =  validateCssUnit(150))),
+  #                                     
+  #                                     h5(strong("Red Spruce")),
+  #                                     h6("(Picea rubens)"),
+  #                                     column(6,align = "right",numericInput("Picea_rubens", "AGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                     column(6,align = "left",numericInput("Picea_rubensUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                     
+  #                                     h5(strong("White Pine")),
+  #                                     h6("(Pinus strobus)"),
+  #                                     column(6,align = "right",numericInput("Pinus_strobus", "AGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                     column(6,align = "left",numericInput("Pinus_strobusUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                     
+  #                                     h5(strong("White Spruce")),
+  #                                     h6("(Picea glauca)"),
+  #                                     column(6,align = "right",numericInput("Picea_glauca", "AGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                     column(6,align = "left",numericInput("Picea_glaucaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                     
+  #                                     
+  #                              )
+  # ),
+  ### Known BATree sp. Inputs ######
+  # "Known Basal Area by Species" =  fluidRow(style = "overflow-y:scroll; max-height: 400px; position:relative;",
+  #                                           column(6, align = "center",
+  #                                                  h5(strong("American Beech")),
+  #                                                  h6("(Fagus grandifolia)"),
+  #                                                  column(6,align = "right",numericInput("Fagus_grandifolia", "AGS", 0, min = 0,width = validateCssUnit(100))),
+  #                                                  column(6,align = "left",numericInput("Fagus_grandifoliaUGS", "UGS", 0, min = 0,width = validateCssUnit(100))),
+  #                                                  
+  #                                                  h5(strong("American Elm")),
+  #                                                  h6("(Ulmus americana)"),
+  #                                                  column(6,align = "right",numericInput("Ulmus_americana", "AGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                                  column(6,align = "left",numericInput("Ulmus_americanaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                                  
+  #                                                  h5(strong("Balsam Poplar")),
+  #                                                  h6("(Populus balsamifera)"),
+  #                                                  column(6,align = "right", numericInput("Populus_balsamifera", "AGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                                  column(6,align = "left",numericInput("Populus_balsamiferaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                                  
+  #                                                  h5(strong("Bigtooth Aspen")),
+  #                                                  h6("(Populus grandidentata)"),
+  #                                                  column(6,align = "right",numericInput("Populus_grandidentata", "AGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                                  column(6,align = "left",numericInput("Populus_grandidentataUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                                  
+  #                                                  h5(strong("Black Birch")),
+  #                                                  h6("(Betula lenta)"),
+  #                                                  column(6,align = "right", numericInput("Betula_lenta", "AGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                                  column(6,align = "left",numericInput("Betula_lentaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                                  
+  #                                                  h5(strong("Black Cherry")),
+  #                                                  h6("(Prunus serotina)"),
+  #                                                  column(6,align = "right",numericInput("Prunus_serotina", "AGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                                  column(6,align = "left",numericInput("Prunus_serotinaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                                  
+  #                                                  h5(strong("Grey Birch")),
+  #                                                  h6("(Betual populifolia)"),
+  #                                                  column(6,align = "right",numericInput("Betula_populifolia", "AGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                                  column(6,align = "left",numericInput("Betula_populifoliaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                                  
+  #                                                  h5(strong("Quaking Aspen")),
+  #                                                  h6("(Populaus tremuloides)"),
+  #                                                  column(6,align = "right",numericInput("Populus_tremuloides", "AGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                                  column(6,align = "left",numericInput("Populus_tremuloidesUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                                  
+  #                                                  h5(strong("Red Maple")),
+  #                                                  h6("(Acer rubrum)"),
+  #                                                  column(6,align = "right",numericInput("Acer_rubrum", "AGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                                  column(6,align = "left",numericInput("Acer_rubrumUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                                  
+  #                                                  h5(strong("Red Oak")),
+  #                                                  h6("(Quercus rubra)"),
+  #                                                  column(6,align = "right",numericInput("Quercus_rubra", "AGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                                  column(6,align = "left",numericInput("Quercus_rubraUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                                  
+  #                                                  h5(strong("Sugar Maple")),
+  #                                                  h6("(Acer saccharum)"),
+  #                                                  column(6,align = "right",numericInput("Acer_saccharum", "AGS", 0, min = 0, width =  validateCssUnit(100))),
+  #                                                  column(6,align = "left",numericInput("Acer_saccharumUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                                  
+  #                                                  h5(strong("White Ash")),
+  #                                                  h6("(Fraxinus americana)"),
+  #                                                  column(6,align = "right",numericInput("Fraxinus_americana", "AGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                                  column(6,align = "left",numericInput("Fraxinus_americanaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                                  
+  #                                                  h5(strong("White Birch")),
+  #                                                  h6("(Betula papyrifera)"),
+  #                                                  column(6,align = "right",numericInput("Betula_papyrifera", "AGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                                  column(6,align = "left",numericInput("Betula_papyriferaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                                  
+  #                                                  h5(strong("White Oak")),
+  #                                                  h6("(Quercus alba)"),
+  #                                                  column(6,align = "right",numericInput("Quercus_alba", "AGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                                  column(6,align = "left",numericInput("Quercus_albaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                                  
+  #                                                  h5(strong("Yellow Birch")),
+  #                                                  h6("(Betula alleghaniensis)"),
+  #                                                  column(6,align = "right",numericInput("Betula_alleghaniensis", "AGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                                  column(6,align = "left",numericInput("Betula_alleghaniensisUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                           ),
+  #                                           column(6, align = "center",
+  #                                                  h5(strong("Arborvitae")),
+  #                                                  h6("(Thuja occidentailis)"),
+  #                                                  column(6,align = "right",numericInput("Thuja_occidentalis", "AGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                                  column(6,align = "left",numericInput("Thuja_occidentalisUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                                  
+  #                                                  h5(strong("Balsam Fir")),
+  #                                                  h6("(Abies balsamea)"),
+  #                                                  column(6,align = "right",numericInput("Abies_balsamea", "AGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                                  column(6,align = "left",numericInput("Abies_balsameaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                                  
+  #                                                  h5(strong("Black Spruce")),
+  #                                                  h6("(Picea Mariana)"),
+  #                                                  column(6,align = "right",numericInput("Picea_mariana", "AGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                                  column(6,align = "left",numericInput("Picea_marianaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                                  
+  #                                                  h5(strong("Eastern Hemlock")),
+  #                                                  h6("(Tsuga canadensis)"),
+  #                                                  column(6,align = "right",numericInput("Tsuga_canadensis", "AGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                                  column(6,align = "left",numericInput("Tsuga_canadensisUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                                  
+  #                                                  h5(strong("Eastern Tamarack")),
+  #                                                  h6("(Larix laricina)"),
+  #                                                  column(6,align = "right",numericInput("Larix_laricina", "AGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                                  column(6,align = "left",numericInput("Larix_laricinaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                                  
+  #                                                  h5(strong("Red Pine")),
+  #                                                  h6("(Pinus resinosa)"),
+  #                                                  column(6,align = "right",numericInput("Pinus_resinosa", "AGS", 0, min = 0, width = validateCssUnit(150))),
+  #                                                  column(6,align = "left",numericInput("Pinus_resinosaUGS", "UGS", 0, min = 0, width =  validateCssUnit(150))),
+  #                                                  
+  #                                                  h5(strong("Red Spruce")),
+  #                                                  h6("(Picea rubens)"),
+  #                                                  column(6,align = "right",numericInput("Picea_rubens", "AGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                                  column(6,align = "left",numericInput("Picea_rubensUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                                  
+  #                                                  h5(strong("White Pine")),
+  #                                                  h6("(Pinus strobus)"),
+  #                                                  column(6,align = "right",numericInput("Pinus_strobus", "AGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                                  column(6,align = "left",numericInput("Pinus_strobusUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                                  
+  #                                                  h5(strong("White Spruce")),
+  #                                                  h6("(Picea glauca)"),
+  #                                                  column(6,align = "right",numericInput("Picea_glauca", "AGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                                  column(6,align = "left",numericInput("Picea_glaucaUGS", "UGS", 0, min = 0, width = validateCssUnit(100))),
+  #                                                  
+  #                                                  
+  #                                           )
+  # ),
+  ### BA perc Tree sp. Inputs ######
+  # 'Basal Area percentage' =  fluidRow(style = "overflow-y:scroll; max-height: 400px; position:relative;",
+  #                                     column(6, align = "center",
+  #                                            h5(strong("American Beech")),
+  #                                            h6("(Fagus grandifolia)"),
+  #                                            column(6,align = "right",numericInput("Fagus_grandifolia", "BA percentage", 0, min = 0, max = 1)),
+  #                                            column(6,align = "left", sliderInput("Fagus_grandifoliaAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
+  #                                            
+  #                                            h5(strong("American Elm")),
+  #                                            h6("(Ulmus americana)"),
+  #                                            column(6,align = "right",numericInput("Ulmus_americana", "BA percentage", 0, min = 0, max = 1)),
+  #                                            column(6,align = "left",sliderInput("Ulmus_americanaAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
+  #                                            
+  #                                            h5(strong("Balsam Poplar")),
+  #                                            h6("(Populus balsamifera)"),
+  #                                            column(6,align = "right", numericInput("Populus_balsamifera", "BA percentage", 0, min = 0, max = 1)),
+  #                                            column(6,align = "left",sliderInput("Populus_balsamiferaAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
+  #                                            
+  #                                            h5(strong("Bigtooth Aspen")),
+  #                                            h6("(Populus grandidentata)"),
+  #                                            column(6,align = "right",numericInput("Populus_grandidentata", "BA percentage", 0, min = 0, max = 1)),
+  #                                            column(6,align = "left",sliderInput("Populus_grandidentataAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
+  #                                            
+  #                                            h5(strong("Black Birch")),
+  #                                            h6("(Betula lenta)"),
+  #                                            column(6,align = "right", numericInput("Betula_lenta", "BA percentage", 0, min = 0, max = 1)),
+  #                                            column(6,align = "left",sliderInput("Betula_lentaAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
+  #                                            
+  #                                            h5(strong("Black Cherry")),
+  #                                            h6("(Prunus serotina)"),
+  #                                            column(6,align = "right",numericInput("Prunus_serotina", "BA percentage", 0, min = 0, max = 1)),
+  #                                            column(6,align = "left",sliderInput("Prunus_serotinaAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
+  #                                            
+  #                                            h5(strong("Grey Birch")),
+  #                                            h6("(Betual populifolia)"),
+  #                                            column(6,align = "right",numericInput("Betula_populifolia", "BA percentage", 0, min = 0, max = 1)),
+  #                                            column(6,align = "left",sliderInput("Betula_populifoliaAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
+  #                                            
+  #                                            h5(strong("Quaking Aspen")),
+  #                                            h6("(Populaus tremuloides)"),
+  #                                            column(6,align = "right",numericInput("Populus_tremuloides", "BA percentage", 0, min = 0, max = 1)),
+  #                                            column(6,align = "left",sliderInput("Populus_tremuloidesAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
+  #                                            
+  #                                            h5(strong("Red Maple")),
+  #                                            h6("(Acer rubrum)"),
+  #                                            column(6,align = "right",numericInput("Acer_rubrum", "BA percentage", 0, min = 0, max = 1)),
+  #                                            column(6,align = "left",sliderInput("Acer_rubrumAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
+  #                                            
+  #                                            h5(strong("Red Oak")),
+  #                                            h6("(Quercus rubra)"),
+  #                                            column(6,align = "right",numericInput("Quercus_rubra", "BA percentage", 0, min = 0, max = 1)),
+  #                                            column(6,align = "left",sliderInput("Quercus_rubraAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
+  #                                            
+  #                                            h5(strong("Sugar Maple")),
+  #                                            h6("(Acer saccharum)"),
+  #                                            column(6,align = "right",numericInput("Acer_saccharum", "BA percentage", 0, min = 0, max = 1)),
+  #                                            column(6,align = "left",sliderInput("Acer_saccharumAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
+  #                                            
+  #                                            h5(strong("White Ash")),
+  #                                            h6("(Fraxinus americana)"),
+  #                                            column(6,align = "right",numericInput("Fraxinus_americana", "BA percentage", 0, min = 0, max = 1)),
+  #                                            column(6,align = "left",sliderInput("Fraxinus_americanaAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
+  #                                            
+  #                                            h5(strong("White Birch")),
+  #                                            h6("(Betula papyrifera)"),
+  #                                            column(6,align = "right",numericInput("Betula_papyrifera", "BA percentage", 0, min = 0, max = 1)),
+  #                                            column(6,align = "left",sliderInput("Betula_papyriferaAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
+  #                                            
+  #                                            h5(strong("White Oak")),
+  #                                            h6("(Quercus alba)"),
+  #                                            column(6,align = "right",numericInput("Quercus_alba", "BA percentage", 0, min = 0, max = 1)),
+  #                                            column(6,align = "left",sliderInput("Quercus_albaAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
+  #                                            
+  #                                            h5(strong("Yellow Birch")),
+  #                                            h6("(Betula alleghaniensis)"),
+  #                                            column(6,align = "right",numericInput("Betula_alleghaniensis", "BA percentage", 0, min = 0, max = 1)),
+  #                                            column(6,align = "left",sliderInput("Betula_alleghaniensisAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
+  #                                     ),
+  #                                     column(6, align = "center",
+  #                                            h5(strong("Arborvitae")),
+  #                                            h6("(Thuja occidentailis)"),
+  #                                            column(6,align = "right",numericInput("Thuja_occidentalis", "BA percentage", 0, min = 0, max = 1)),
+  #                                            column(6,align = "left",sliderInput("Thuja_occidentalisAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
+  #                                            
+  #                                            h5(strong("Balsam Fir")),
+  #                                            h6("(Abies balsamea)"),
+  #                                            column(6,align = "right",numericInput("Abies_balsamea", "BA percentage", 0, min = 0, max = 1)),
+  #                                            column(6,align = "left",sliderInput("Abies_balsameaAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
+  #                                            
+  #                                            h5(strong("Black Spruce")),
+  #                                            h6("(Picea Mariana)"),
+  #                                            column(6,align = "right",numericInput("Picea_mariana", "BA percentage", 0, min = 0, max = 1)),
+  #                                            column(6,align = "left",sliderInput("Picea_marianaAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
+  #                                            
+  #                                            h5(strong("Eastern Hemlock")),
+  #                                            h6("(Tsuga canadensis)"),
+  #                                            column(6,align = "right",numericInput("Tsuga_canadensis", "BA percentage", 0, min = 0, max = 1)),
+  #                                            column(6,align = "left",sliderInput("Tsuga_canadensisAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
+  #                                            
+  #                                            h5(strong("Eastern Tamarack")),
+  #                                            h6("(Larix laricina)"),
+  #                                            column(6,align = "right",numericInput("Larix_laricina", "BA percentage", 0, min = 0, max = 1)),
+  #                                            column(6,align = "left",sliderInput("Larix_laricinaAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
+  #                                            
+  #                                            h5(strong("Red Pine")),
+  #                                            h6("(Pinus resinosa)"),
+  #                                            column(6,align = "right",numericInput("Pinus_resinosa", "BA percentage", 0, min = 0, max = 1)),
+  #                                            column(6,align = "left",sliderInput("Pinus_resinosaAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1))),
+  #                                            
+  #                                            h5(strong("Red Spruce")),
+  #                                            h6("(Picea rubens)"),
+  #                                            column(6,align = "right",numericInput("Picea_rubens", "BA percentage", 0, min = 0, max = 1)),
+  #                                            column(6,align = "left",sliderInput("Picea_rubensAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
+  #                                            
+  #                                            h5(strong("White Pine")),
+  #                                            h6("(Pinus strobus)"),
+  #                                            column(6,align = "right",numericInput("Pinus_strobus", "BA percentage", 0, min = 0, max = 1)),
+  #                                            column(6,align = "left",sliderInput("Pinus_strobusAGS", "percentAGS", 0, min = 0, max = 1, step = 0.1)),
+  #                                            
+  #                                            h5(strong("White Spruce")),
+  #                                            h6("(Picea glauca)"),
+  #                                            column(6,align = "right",numericInput("Picea_glauca", "BA percentage", 0, min = 0,max = 1)),
+  #                                            column(6,align = "left",sliderInput("Picea_glaucaAGS", "percentAGS", 0, min = 0,max = 1, step = 0.1))
+  #                                     )
+  # )
+  
+ 
+  ## Render Plot #####      
     output$plot  <- renderPlotly({
       validate(
         need(sum(SpeciesDataInput()$AGSValue)>0, 
@@ -1185,7 +1248,7 @@ shinyApp(
       plot
       
     })
-    
+  ## Render Degradation Value ####   
     output$degValue <- renderText({
       validate(
         need(sum(SpeciesDataInput()$AGSValue)>0, 
@@ -1359,11 +1422,13 @@ shinyApp(
       
     })
     
-    output$Testdf <- renderTable({
-      
-      weight_SG <- SpeciesDataInput() %>% 
-        mutate(wtSG = sg*TOTBA) %>% 
-        reframe(Avg_SG = sum(wtSG)/sum(TOTBA))
+    # output$Testdf <- renderTable({
+      # 
+      # weight_SG <- SpeciesDataInput() %>% 
+      #   mutate(wtSG = sg*TOTBA) %>% 
+      #   reframe(Avg_SG = sum(wtSG)/sum(TOTBA))
+      # 
+      # 
       # # data.frame(sp = sg_ref %>% pull(Gen_sp))
       # splist <- sg_ref %>% pull(Gen_sp)
       # # Use lapply to iterate over the input IDs
@@ -1400,17 +1465,23 @@ shinyApp(
       # # Return the dataframe
       # data
 
-      })
+      # })
     
-    output$testtxt <- renderText({
-      weight_SG <- SpeciesDataInput() %>% 
-        mutate(wtSG = sg*TOTBA) %>% 
-        reframe(Avg_SG = sum(wtSG)/sum(TOTBA)) %>% 
-        pull(Avg_SG)
+    # Display all inputs in the console
+    # observe({
+    #   print(reactiveValuesToList(input))
+    # })
+    # output$allInputs  <- renderPrint({
+    #   reactiveValuesToList(input)
+    # })
+      # weight_SG <- SpeciesDataInput() %>% 
+      #   mutate(wtSG = sg*TOTBA) %>% 
+      #   reframe(Avg_SG = sum(wtSG)/sum(TOTBA)) %>% 
+      #   pull(Avg_SG)
       
       # Avg_SG <- sum(weight_SG)/sum(AGSBA+UGSBA)
-    })
-    
+
+  ## Render Display Table (treelist input) ####
     output$FVS <- renderDataTable({
       
       fvs_calc(datasetInput(),primaryInput(),SecondaryInput(),TertiaryInput())
@@ -1470,6 +1541,8 @@ shinyApp(
       
       
     })
+
+  ## Downloader Data Table ####
     output$downloadData <- downloadHandler(
       
       
