@@ -17,26 +17,28 @@ library(shinyalert)
 
 options(app_idle_timeout = 0, shiny.maxRequestSize = 3000*1024^2)
 # Load Data ####
-
-sg_ref <- as.data.frame(read_csv('sg_ref.csv'))
-
-primesp <- sg_ref %>%
-  filter(desirability == 1) %>% 
-  pull(cname,Gen_sp)
-
-secsp <- sg_ref %>%
-  filter(desirability == 2) %>% 
-  pull(cname,Gen_sp)
-
-tertsp <- sg_ref %>%
-  filter(desirability == 3) %>% 
-  pull(cname,Gen_sp)
-
-hwdf <- sg_ref %>% 
-  filter(HW_SW == "HW")
-
-swdf <- sg_ref %>% 
-  filter(HW_SW == 'SW')
+# 
+# sg_ref <- as.data.frame(read_csv('sg_ref.csv')) %>%
+#   filter(desirability > 4) %>%
+#   filter(Northeast == 1)
+# 
+# primesp <- sg_ref %>%
+#   filter(desirability == 1) %>%
+#   pull(cname,Gen_sp)
+# 
+# secsp <- sg_ref %>%
+#   filter(desirability == 2) %>%
+#   pull(cname,Gen_sp)
+# 
+# tertsp <- sg_ref %>%
+#   filter(desirability == 3) %>%
+#   pull(cname,Gen_sp)
+# 
+# hwdf <- sg_ref %>%
+#   filter(HW_SW == "HW")
+# 
+# swdf <- sg_ref %>%
+#   filter(HW_SW == 'SW')
 # function builder ####
   ## functions for calculating stocking percentages ####
 
@@ -73,11 +75,11 @@ A_lineBA <- function(DBH, SG){
 
   ## function to read in and calculate deg for a FVS output ####
 fvs_calc <- function(data, prime,sec,tert){
-  SG_ref <- vroom("SG_ref.csv", col_types = "ffnn")
+  # SG_ref <- vroom("SG_ref.csv", col_types = "ffnn")
   
   removedSp <- c("ACSA3","FAGR","TSCA","PIRU","BEAL2","ACRU","ABBA","ACPE")
   
-  SG_ref$splist <- sub("^0+", "", SG_ref$splist)
+  sg_ref()$splist <- sub("^0+", "", sg_ref()$splist)
   
   #remove rows that have plant ID instead of fia sp codes
   data<- data[!grepl(paste(removedSp, collapse="|"), data$Species),]
@@ -87,7 +89,7 @@ fvs_calc <- function(data, prime,sec,tert){
   
   #join fvs data SG ref so we have specific gravity for all species
   df1 <- data%>%
-    full_join(SG_ref, by = c("Species" = "splist"))
+    full_join(sg_ref(), by = c("Species" = "splist"))
   
   #create coloumns for tree factor, relative density, and counting trees by desirability.
   df1.2 <- df1%>%
@@ -121,19 +123,18 @@ fvs_calc <- function(data, prime,sec,tert){
   return(dfStandRD_v2)
 }
 createhw_input_pair_ui <- function(hwspecies_name, hwsci_name) {
-  fluidRow(
-    style = "overflow-y:scroll; max-height: 400px; position:relative;",
+  fluidRow(style = "overflow-y:scroll; max-height: 400px; position:relative;",
     column(6, align = "center",
            h5(strong(hwspecies_name)),
            h6(hwsci_name),
-           column(6, align = "right", numericInput(
+           column(6, align = "center", numericInput(
              inputId = hwsci_name,
              label = "AGS",
              value = 0,
              min = 0,
              width = validateCssUnit(200)
            )),
-           column(6, align = "left", numericInput(
+           column(6, align = "center", numericInput(
              inputId = paste0(hwsci_name, "UGS",sep = ''),
              label = "UGS",
              value = 0,
@@ -145,19 +146,18 @@ createhw_input_pair_ui <- function(hwspecies_name, hwsci_name) {
 }
 
 createsw_input_pair_ui <- function(swspecies_name, swsci_name) {
-  fluidRow(
-    style = "overflow-y:scroll; max-height: 400px; position:relative;",
+  fluidRow(style = "overflow-y:scroll; max-height: 400px; position:relative;",
     column(6, align = "center",
            h5(strong(swspecies_name)),
            h6(swsci_name),
-           column(6, align = "right", numericInput(
+           column(6, align = "center", numericInput(
              inputId = swsci_name,
              label = "AGS",
              value = 0,
              min = 0,
              width = validateCssUnit(200)
            )),
-           column(6, align = "left", numericInput(
+           column(6, align = "center", numericInput(
              inputId = paste0(swsci_name, "UGS", sep = ''),
              label = "UGS",
              value = 0,
@@ -169,12 +169,11 @@ createsw_input_pair_ui <- function(swspecies_name, swsci_name) {
 }
 
 createhwslider_input_pair_ui <- function(hwspecies_name, hwsci_name) {
-  fluidRow(
-    style = "overflow-y:scroll; max-height: 400px; position:relative;",
+  fluidRow(style = "overflow-y:scroll; max-height: 400px; position:relative;",
     column(6, align = "center",
            h5(strong(hwspecies_name)),
            h6(hwsci_name),
-           column(6, align = "right", numericInput(
+           column(6, align = "center", numericInput(
              inputId = hwsci_name,
              label = "Basal Area Proportion",
              value = 0,
@@ -182,7 +181,7 @@ createhwslider_input_pair_ui <- function(hwspecies_name, hwsci_name) {
              max = 1,
              width = validateCssUnit(200)
            )),
-           column(6, align = "left", sliderInput(
+           column(6, align = "center", sliderInput(
              inputId = paste0(hwsci_name, "AGS", sep = ''),
              label = "Proportion AGS",
              value = 0,
@@ -195,12 +194,11 @@ createhwslider_input_pair_ui <- function(hwspecies_name, hwsci_name) {
 }
 
 createswslider_input_pair_ui <- function(swspecies_name, swsci_name) {
-  fluidRow(
-    style = "overflow-y:scroll; max-height: 400px; position:relative;",
+  fluidRow(style = "overflow-y:scroll; max-height: 400px; position:relative;",
     column(6, align = "center",
            h5(strong(swspecies_name)),
            h6(swsci_name),
-           column(6, align = "right", numericInput(
+           column(6, align = "center", numericInput(
              inputId = swsci_name,
              label = "Basal Area Proportion",
              value = 0,
@@ -208,7 +206,7 @@ createswslider_input_pair_ui <- function(swspecies_name, swsci_name) {
              max = 1,
              width = validateCssUnit(200)
            )),
-           column(6, align = "left", sliderInput(
+           column(6, align = "center", sliderInput(
              inputId = paste0(swsci_name, "AGS", sep = ''),
              label = "Proportion AGS",
              value = 0,
@@ -244,7 +242,6 @@ shinyApp(
                       }
                       #images .slick-next {
                         position:default;
-
                       }
                       .slick-prev:before, .slick-next:before { 
                           color:#2c3e50 ;
@@ -252,8 +249,8 @@ shinyApp(
                       }
                       .content {
                           margin: auto;
-                          padding: 10px;
-                          width: 90%;
+                          padding: auto;
+                          width: auto;
                       }"))
     ),
     navbarPage(
@@ -305,8 +302,9 @@ shinyApp(
     ### Sidebar Panel ####
                sidebarPanel(
                  #input if a Basal area prism is going to be used or known basal area by species
+                 selectInput('region','Plese Select Region', choices = c("Northeast",'Mid-Atlantic'),selected = 'Northeast'),
                  selectInput('BAInput','1. Prism Plot Data or Known Basal Area (sqft/acre) by Species?',
-                             choices =  c('Prism Plot Data','Known Basal Area by Species','Basal Area percentage')),
+                             choices =  c('Prism Plot Data','Known Basal Area by Species','Basal Area percentage'),selected = "Prism Plot Data"),
                  bsTooltip("BAInput", "Choose if you are entering 1. Data directly from a prism plot2. The known basal area (sqft/acre) by species in the stand3. The percent basal area of each species.",
                            "right", options = list(container = "body")),
                  
@@ -330,20 +328,16 @@ shinyApp(
                  uiOutput("ui"),
                  uiOutput('KnownBANote'),
                  fluidPage(
-                   # style = "overflow-y:scroll; max-height: 400px; position:relative;",
-                           
-                           column(6, align = "center",
-                                  uiOutput("HWTrDtInputs")),
-                           column(6, align = "center",
-                                  uiOutput('SWTrDtInputs'))
+                   uiOutput("HWTrDtInputs"),
+                   uiOutput('SWTrDtInputs')
                  )
     ### Main panel#####
                ),
                mainPanel(
                  fluidRow(style = "padding-left: 200px",align = "center",
-                           plotlyOutput("plot",width = 600, height = 700)
+                           plotlyOutput("plot",width = 600, height = 700),
                            #tableOutput("Testdf"),
-                           #verbatimTextOutput("allInputs")
+                           verbatimTextOutput("allInputs")
                  
                  ),
                  fluidRow(style = "padding: 50px,50px,50px,50px", align = "center",
@@ -410,28 +404,7 @@ shinyApp(
                         h3("Change species desirablity categories"),
                         h5("Click and drag species into prefered desirability boxes. To reset species, simply refresh app")
                ),
-               fluidRow(align = "center",
-                        bucket_list(
-                          header = c(""),
-                          add_rank_list(
-                            text = "Primary",
-                            labels = primesp,
-                            input_id = "prime"
-                          ),
-                          add_rank_list(
-                            text = "Secondary",
-                            labels = secsp,
-                            input_id = "sec"
-                          ),
-                          add_rank_list(
-                            text = "Tertiary",
-                            labels = tertsp,
-                            input_id = "tert"
-                          ),
-                          
-                          group_name = "bucket_list_group"
-                        )
-               ),
+               uiOutput('list'),
                fluidRow(align = "center",
                         h6("Default Species Categories"),
                         tags$div(
@@ -453,6 +426,38 @@ shinyApp(
   server = function(input, output) {
     
   ## reactive objects ####
+    SpDataframe <- reactive({
+      as.data.frame(read_csv('sg_ref.csv')) %>%
+        filter(desirability < 4)
+    })
+    sg_ref <- reactive({
+      
+      sg_ref <- SpDataframe() %>%
+        filter(!!sym(input$region) == 1)
+      
+    })
+    
+      primesp <- reactive({
+        sg_ref() %>%
+        filter(desirability == 1) %>%
+        pull(cname,Gen_sp)
+      })
+      secsp <- reactive({sg_ref() %>%
+        filter(desirability == 2) %>%
+        pull(cname,Gen_sp)
+      })
+      tertsp <- reactive({
+        sg_ref() %>%
+        filter(desirability == 3) %>%
+        pull(cname,Gen_sp)
+      })
+      hwdf <-reactive({
+        sg_ref() %>%
+        filter(HW_SW == "HW")
+      })
+      swdf <- reactive({sg_ref() %>%
+        filter(HW_SW == 'SW')
+      })
     datasetInput <- reactive({
       file <- input$FVS_Sheet
       
@@ -475,8 +480,8 @@ shinyApp(
     
     hw_inputs <- reactive({
       # Apply the function to each row of the dataframe to create input pairs
-      inputhw_pairs_ui <- lapply(1:nrow(hwdf), function(i) {
-        createhw_input_pair_ui(hwdf$cname[i], hwdf$Gen_sp[i])
+      inputhw_pairs_ui <- lapply(1:nrow(hwdf()), function(i) {
+        createhw_input_pair_ui(hwdf()$cname[i], hwdf()$Gen_sp[i])
       })
       
       # Combine input pairs into a single UI element
@@ -485,8 +490,8 @@ shinyApp(
     
     sw_inputs <- reactive({
       # Apply the function to each row of the dataframe to create input pairs
-      inputsw_pairs_ui <- lapply(1:nrow(swdf), function(i) {
-        createsw_input_pair_ui(swdf$cname[i], swdf$Gen_sp[i])
+      inputsw_pairs_ui <- lapply(1:nrow(swdf()), function(i) {
+        createsw_input_pair_ui(swdf()$cname[i], swdf()$Gen_sp[i])
       })
       
       # Combine input pairs into a single UI element
@@ -495,8 +500,8 @@ shinyApp(
     
     perhw_inputs <- reactive({
       # Apply the function to each row of the dataframe to create input pairs
-      inputhw_pairs_ui <- lapply(1:nrow(hwdf), function(i) {
-        createhwslider_input_pair_ui(hwdf$cname[i], hwdf$Gen_sp[i])
+      inputhw_pairs_ui <- lapply(1:nrow(hwdf()), function(i) {
+        createhwslider_input_pair_ui(hwdf()$cname[i], hwdf()$Gen_sp[i])
       })
       
       # Combine input pairs into a single UI element
@@ -505,8 +510,8 @@ shinyApp(
     
     persw_inputs <- reactive({
       # Apply the function to each row of the dataframe to create input pairs
-      inputsw_pairs_ui <- lapply(1:nrow(swdf), function(i) {
-        createswslider_input_pair_ui(swdf$cname[i], swdf$Gen_sp[i])
+      inputsw_pairs_ui <- lapply(1:nrow(swdf()), function(i) {
+        createswslider_input_pair_ui(swdf()$cname[i], swdf()$Gen_sp[i])
       })
       
       # Combine input pairs into a single UI element
@@ -517,7 +522,7 @@ shinyApp(
       
       # sg_ref <- read_xlsx('SG_ref.xlsx',sheet = 2)
       # data.frame(sp = sg_ref %>% pull(Gen_sp))
-      splist <- sg_ref %>% pull(Gen_sp)
+      splist <- sg_ref() %>% pull(Gen_sp)
       # Use lapply to iterate over the input IDs
       data_list <- lapply(splist, function(id) {
         # Check if the input has a non-null value
@@ -548,7 +553,7 @@ shinyApp(
                                  TRUE~UGSValue),
                TOTBA = AGSBA+UGSBA) %>% 
         filter(AGSValue!=0) %>% 
-        left_join(sg_ref,by = join_by(Gen_sp))
+        left_join(sg_ref(),by = join_by(Gen_sp))
       
       return(data)
     })
@@ -657,6 +662,31 @@ shinyApp(
       )
     })
   
+  output$list <- 
+    renderUI({
+      fluidRow(align = "center",
+               bucket_list(
+                 header = c(""),
+                 add_rank_list(
+                   text = "Primary",
+                   labels = primesp(),
+                   input_id = "prime"
+                 ),
+                 add_rank_list(
+                   text = "Secondary",
+                   labels = secsp(),
+                   input_id = "sec"
+                 ),
+                 add_rank_list(
+                   text = "Tertiary",
+                   labels = tertsp(),
+                   input_id = "tert"
+                 ),
+                 
+                 group_name = "bucket_list_group"
+               )
+      )
+    })
   
   ### prism Tree sp. Inputs ######
   # "Prism Plot Data" = fluidRow(style = "overflow-y:scroll; max-height: 400px; position:relative;",
@@ -1393,26 +1423,26 @@ shinyApp(
             if(totalBA != input$totBA){
               paste("<font size= '+3'>Oops! it looks like your total basal area entered for 1a. (",input$totBA,") doesn't match the sum of your entered trees!(",totalBA,")")
             }else{
-              if(PAG > cline){
+              if(PAG >= cline){
                 paste("<font size= '+3'>Stand degradation level is ","<p><font color=\"#FF0000\"><font size= '+3'><b>",1)
-              }else if(PSAG > cline){
+              }else if(PSAG >= cline){
                 paste("<font size= '+3'>Stand degradation level is ","<p><font color=\"#FF0000\"><font size= '+3'><b>",2)
-              }else if(PSTAG > cline){
+              }else if(PSTAG >= cline){
                 paste("<font size= '+3'>Stand degradation level is ","<p><font color=\"#FF0000\"><font size= '+3'><b>",3)
-              }else if(totalBA > cline){
+              }else if(totalBA >= cline){
                 paste("<font size= '+3'>Stand degradation level is ","<p><font color=\"#FF0000\"><font size= '+3'><b>",4)
               }else {
                 paste("<font size= '+3'>Stand degradation level is ","<p><font color=\"#FF0000\"><font size= '+3'><b>",5)
               }
             }
           }else{
-            if(PAG > cline){
+            if(PAG >= cline){
               paste("<font size= '+3'>Stand degradation level is ","<p><font color=\"#FF0000\"><font size= '+3'><b>",1)
-            }else if(PSAG > cline){
+            }else if(PSAG >= cline){
               paste("<font size= '+3'>Stand degradation level is ","<p><font color=\"#FF0000\"><font size= '+3'><b>",2)
-            }else if(PSTAG > cline){
+            }else if(PSTAG >= cline){
               paste("<font size= '+3'>Stand degradation level is ","<p><font color=\"#FF0000\"><font size= '+3'><b>",3)
-            }else if(totalBA > cline){
+            }else if(totalBA >= cline){
               paste("<font size= '+3'>Stand degradation level is ","<p><font color=\"#FF0000\"><font size= '+3'><b>",4)
             }else {
               paste("<font size= '+3'>Stand degradation level is ","<p><font color=\"#FF0000\"><font size= '+3'><b>",5)
@@ -1423,7 +1453,8 @@ shinyApp(
     })
     
     # output$Testdf <- renderTable({
-      # 
+    # 
+    # })
       # weight_SG <- SpeciesDataInput() %>% 
       #   mutate(wtSG = sg*TOTBA) %>% 
       #   reframe(Avg_SG = sum(wtSG)/sum(TOTBA))
@@ -1471,14 +1502,14 @@ shinyApp(
     # observe({
     #   print(reactiveValuesToList(input))
     # })
-    # output$allInputs  <- renderPrint({
-    #   reactiveValuesToList(input)
-    # })
-      # weight_SG <- SpeciesDataInput() %>% 
-      #   mutate(wtSG = sg*TOTBA) %>% 
-      #   reframe(Avg_SG = sum(wtSG)/sum(TOTBA)) %>% 
+    output$allInputs  <- renderPrint({
+     print(hw_inputs())
+   })
+      # weight_SG <- SpeciesDataInput() %>%
+      #   mutate(wtSG = sg*TOTBA) %>%
+      #   reframe(Avg_SG = sum(wtSG)/sum(TOTBA)) %>%
       #   pull(Avg_SG)
-      
+
       # Avg_SG <- sum(weight_SG)/sum(AGSBA+UGSBA)
 
   ## Render Display Table (treelist input) ####
