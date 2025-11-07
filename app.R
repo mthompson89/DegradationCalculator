@@ -122,9 +122,10 @@ fvs_calc <- function(data, prime,sec,tert){
     na.omit()
   return(dfStandRD_v2)
 }
+
 createhw_input_pair_ui <- function(hwspecies_name, hwsci_name) {
   fluidRow(style = "overflow-y:scroll; max-height: 400px; position:relative;",
-    column(6, align = "center",
+    column(12, align = "center",
            h5(strong(hwspecies_name)),
            h6(hwsci_name),
            column(6, align = "center", numericInput(
@@ -147,7 +148,7 @@ createhw_input_pair_ui <- function(hwspecies_name, hwsci_name) {
 
 createsw_input_pair_ui <- function(swspecies_name, swsci_name) {
   fluidRow(style = "overflow-y:scroll; max-height: 400px; position:relative;",
-    column(6, align = "center",
+    column(12, align = "center",
            h5(strong(swspecies_name)),
            h6(swsci_name),
            column(6, align = "center", numericInput(
@@ -170,12 +171,12 @@ createsw_input_pair_ui <- function(swspecies_name, swsci_name) {
 
 createhwslider_input_pair_ui <- function(hwspecies_name, hwsci_name) {
   fluidRow(style = "overflow-y:scroll; max-height: 400px; position:relative;",
-    column(6, align = "center",
+    column(12, align = "center",
            h5(strong(hwspecies_name)),
            h6(hwsci_name),
-           column(6, align = "center", numericInput(
+           column(6, align = "center", sliderInput(
              inputId = hwsci_name,
-             label = "Basal Area Proportion",
+             label = "BA Proportion",
              value = 0,
              min = 0,
              max = 1,
@@ -195,12 +196,12 @@ createhwslider_input_pair_ui <- function(hwspecies_name, hwsci_name) {
 
 createswslider_input_pair_ui <- function(swspecies_name, swsci_name) {
   fluidRow(style = "overflow-y:scroll; max-height: 400px; position:relative;",
-    column(6, align = "center",
+    column(12, align = "center",
            h5(strong(swspecies_name)),
            h6(swsci_name),
-           column(6, align = "center", numericInput(
+           column(6, align = "center", sliderInput(
              inputId = swsci_name,
-             label = "Basal Area Proportion",
+             label = "BA Proportion",
              value = 0,
              min = 0,
              max = 1,
@@ -328,22 +329,27 @@ shinyApp(
                  uiOutput("ui"),
                  uiOutput('KnownBANote'),
                  fluidPage(
-                   uiOutput("HWTrDtInputs"),
-                   uiOutput('SWTrDtInputs')
-                 )
-    ### Main panel#####
+                   column(6,uiOutput("HWTrDtInputs")),
+                   column(6,uiOutput('SWTrDtInputs'))
+                 ),
+                 # fluidPage(
+                 #   uiOutput('SWTrDtInputs')
+                 # ),
+                 width = 6
                ),
+    ### Main panel#####
                mainPanel(
                  fluidRow(style = "padding-left: 200px",align = "center",
                            plotlyOutput("plot",width = 600, height = 700),
                            #tableOutput("Testdf"),
-                           verbatimTextOutput("allInputs")
+                           # verbatimTextOutput("allInputs")
                  
                  ),
                  fluidRow(style = "padding: 50px,50px,50px,50px", align = "center",
                           htmlOutput("degValue")
                           
-                 )
+                 ),
+                 width = 6
                  
                )
       ),
@@ -455,7 +461,8 @@ shinyApp(
         sg_ref() %>%
         filter(HW_SW == "HW")
       })
-      swdf <- reactive({sg_ref() %>%
+      swdf <- reactive({
+        sg_ref() %>%
         filter(HW_SW == 'SW')
       })
     datasetInput <- reactive({
