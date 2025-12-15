@@ -159,14 +159,16 @@ createhwslider_input_pair_ui <- function(hwspecies_name, hwsci_name) {
              value = 0.0,
              min = 0.0,
              max = 1.0,
+             step = 0.05,
              width = validateCssUnit(200)
            )),
-           column(6, align = "center", sliderInput(
+           column(6, align = "center", numericInput(
              inputId = paste0(hwsci_name, "AGS", sep = ''),
              label = "Proportion AGS",
-             value = 0,
-             min = 0,
-             max = 1,
+             value = 0.0,
+             min = 0.0,
+             max = 1.0,
+             step = 0.05,
              width = validateCssUnit(200)
            ))
     )
@@ -184,14 +186,16 @@ createswslider_input_pair_ui <- function(swspecies_name, swsci_name) {
              value = 0.0,
              min = 0.0,
              max = 1.0,
+             step = 0.05,
              width = validateCssUnit(200)
            )),
-           column(6, align = "center", sliderInput(
+           column(6, align = "center", numericInput(
              inputId = paste0(swsci_name, "AGS", sep = ''),
              label = "Proportion AGS",
-             value = 0,
-             min = 0,
-             max = 1,
+             value = 0.0,
+             min = 0.0,
+             max = 1.0,
+             step = 0.05,
              width = validateCssUnit(200)
            ))
     )
@@ -282,10 +286,9 @@ shinyApp(
     ### Sidebar Panel ####
                sidebarPanel(
                  #input if a Basal area prism is going to be used or known basal area by species
-                 selectInput('region','Plese Select Region', choices = c("Northeast",'Mid-Atlantic'),selected = 'Northeast'),
                  selectInput('BAInput','1. Prism Plot Data or Known Basal Area (sqft/acre) by Species?',
-                             choices =  c('Prism Plot Data','Known Basal Area by Species','Basal Area percentage'),selected = "Prism Plot Data"),
-                 bsTooltip("BAInput", "Choose if you are entering 1. Data directly from a prism plot2. The known basal area (sqft/acre) by species in the stand3. The percent basal area of each species.",
+                             choices =  c('Prism Plot Data','Basal Area percentage'),selected = "Prism Plot Data"),
+                 bsTooltip("BAInput", "Choose if you are entering 1. Data directly from a prism plot 2. The percent basal area of each species.",
                            "right", options = list(container = "body")),
                  
                  uiOutput('basalArea'),
@@ -306,18 +309,19 @@ shinyApp(
                  bsTooltip("dbhInput", "Choose whether you are going to use the average stand size class to calculate DBH or if you have calculated the mean DBH of the stand",
                            "right", options = list(container = "body")),
                  uiOutput("ui"),
+                 uiOutput('speciesInputs'),
                  uiOutput('KnownBANote'),
                  fluidPage(
                    column(6,uiOutput("HWTrDtInputs")),
                    column(6,uiOutput('SWTrDtInputs'))
                  ),
-                 # fluidPage(
-                 #   uiOutput('SWTrDtInputs')
-                 # ),
                  width = 6
                ),
     ### Main panel#####
                mainPanel(
+                 # fluidRow(style = "padding-left: 200px",align = "center",
+                 #          tableOutput("testTable")
+                 # ),
                  fluidRow(style = "padding-left: 200px",align = "center",
                            plotlyOutput("plot",width = 600, height = 700),
 
@@ -417,10 +421,7 @@ shinyApp(
     
     #get the specific gravity reference and filter to region
     sg_ref <- reactive({
-      
-      sg_ref <- SpDataframe() %>%
-        filter(!!sym(input$region) == 1)
-      
+      sg_ref <- SpDataframe() 
     })
     
     #separate each desirability group
@@ -440,11 +441,13 @@ shinyApp(
       })
       hwdf <-reactive({
         sg_ref() %>%
-        filter(HW_SW == "HW")
+          filter(cname %in% input$spInput) %>% 
+          filter(HW_SW == "HW")
       })
       swdf <- reactive({
         sg_ref() %>%
-        filter(HW_SW == 'SW')
+          filter(cname %in% input$spInput) %>%
+          filter(HW_SW == 'SW')
       })
       
     datasetInput <- reactive({
@@ -515,16 +518,25 @@ shinyApp(
         # Check if the input has a non-null value
         if (!is.null(input[[id]])){
           # If value is not null, return a dataframe row
-          data.frame(Gen_sp = id, AGSValue = input[[id]],
+          data.frame(Gen_sp = id, 
+                     AGSValue = input[[id]],
                      UGSValue = ifelse(input$BAInput != 'Basal Area percentage',
                                        input[[paste(id,'UGS',sep = "")]],
                                        (1-input[[paste(id,'AGS',sep = '')]])*input[[id]]),
                      AGSProp = ifelse(input$BAInput == 'Basal Area percentage',
                                       input[[id]]*input[[paste(id,"AGS",sep = '')]],
-                                      0))
+                                      0)) 
         } else {
           # If value is null, return NULL
-          NULL
+          
+          # data.frame(Gen_sp = id, 
+          #            AGSValue = input[[id]],
+          #            UGSValue = ifelse(input$BAInput != 'Basal Area percentage',
+          #                              input[[paste(id,'UGS',sep = "")]],
+          #                              (1-input[[paste(id,'AGS',sep = '')]])*input[[id]]),
+          #            AGSProp = ifelse(input$BAInput == 'Basal Area percentage',
+          #                             input[[id]]*input[[paste(id,"AGS",sep = '')]],
+          #                             0)) 
         }
       })
       
@@ -552,7 +564,7 @@ shinyApp(
       switch(input$BAInput,
              "Prism Plot Data" = numericInput("BAF","1a. Basal Area Factor",value = 5), 
              
-             "Known Basal Area by Species" = NULL,
+             # "Known Basal Area by Species" = NULL,
              
              "Basal Area percentage" = NULL
              
@@ -565,7 +577,7 @@ shinyApp(
       switch(input$BAInput,
              "Prism Plot Data" = numericInput("Nsweeps","1b. Number of prism points", value = 1),
              
-             "Known Basal Area by Species" = NULL,
+             # "Known Basal Area by Species" = NULL,
              
              "Basal Area percentage" = NULL
              
@@ -579,7 +591,7 @@ shinyApp(
       switch(input$BAInput,
              "Prism Plot Data" = NULL,
              
-             "Known Basal Area by Species" = numericInput("totBA","1a. Total Basal Area of Stand", value = 0),
+             # "Known Basal Area by Species" = numericInput("totspBA","1a. Total Basal Area of Stand", value = 0),#totspBA
              
              "Basal Area percentage" = numericInput("totBA","1a. Total Basal Area of Stand", value = 0)
              
@@ -596,12 +608,12 @@ shinyApp(
                column(6, align = "center", h3(strong("Hardwood"))),
                column(6, align = "center", h3(strong("Softwood")))
              ),
-             
-             "Known Basal Area by Species" = fluidRow(
-               h5(strong("3. Input Basal Area by Species")),
-               column(6, align = "center", h3(strong("Hardwood"))),
-               column(6, align = "center", h3(strong("Softwood")))
-             ),
+             # 
+             # "Known Basal Area by Species" = fluidRow(
+             #   h5(strong("3. Input Basal Area by Species")),
+             #   column(6, align = "center", h3(strong("Hardwood"))),
+             #   column(6, align = "center", h3(strong("Softwood")))
+             # ),
              "Basal Area percentage" = fluidRow(
                h5(strong("3. Input Percent (in decimal) Basal Area by Species")),
                column(6, align = "center", h3(strong("Hardwood"))),
@@ -627,24 +639,30 @@ shinyApp(
       )
     })
     
-
+    output$speciesInputs <- renderUI({
+      selectInput("spInput","2b. Select Species Present In Stand",
+                  sg_ref()$cname,multiple = T)
+    })
+    
     output$HWTrDtInputs <- renderUI({
       if (is.null(input$BAInput))
         return()
-      
+      if(is.null(input$spInput))
+        return()
       switch(input$BAInput,
              "Prism Plot Data" = hw_inputs(),
-             "Known Basal Area by Species" = hw_inputs(),
+             # "Known Basal Area by Species" = hw_inputs(),
              'Basal Area percentage' = perhw_inputs()
       )
     })
     output$SWTrDtInputs <- renderUI({
       if (is.null(input$BAInput))
         return()
-      
+      if(is.null(input$spInput))
+        return()
       switch(input$BAInput,
              "Prism Plot Data" = sw_inputs(),
-             "Known Basal Area by Species" = sw_inputs(),
+             # "Known Basal Area by Species" = sw_inputs(),
              'Basal Area percentage' = persw_inputs()
       )
     })
@@ -679,6 +697,9 @@ shinyApp(
   
  
   ## Render Plot #####      
+  output$testTable <- renderTable({
+    SpeciesDataInput()
+  })
     output$plot  <- renderPlotly({
 
       validate(
@@ -765,12 +786,31 @@ shinyApp(
     })
   ## Render Degradation Value ####   
     output$degValue <- renderText({
+      
       validate(
-        need(sum(SpeciesDataInput()$AGSValue)>0, 
-       
-             "Please Input Tree Species To Calculate Degradation Class
-                     Results Will Appear Here")
+        need(
+          {
+            # Try running the reactive safely
+            data <- try(SpeciesDataInput(), silent = TRUE)
+            
+            # If there was an error, return FALSE (trigger message)
+            if (inherits(data, "try-error")) {
+              FALSE
+            } else {
+              # Otherwise, check if AGSValue sums to more than 0
+              sum(data$AGSValue, na.rm = TRUE) > 0
+            }
+          },
+          "Please input tree species to calculate degradation class. Results will appear here."
+        )
       )
+      # 
+      # validate(
+      #   need(sum(SpeciesDataInput()$AGSValue)>0, 
+      #  
+      #        "Please Input Tree Species To Calculate Degradation Class
+      #                Results Will Appear Here")
+      # )
       
     
       ######
@@ -818,7 +858,8 @@ shinyApp(
                      pull(AGSBA))
       totalBA <- sum(SpeciesDataInput()$TOTBA)
 
-        if(is.null(input$totBA) == FALSE){
+      if(input$BAinput == 'Basal Area percentage'){
+          if(is.null(input$totBA) == FALSE){
             if(totalBA != input$totBA){
               paste("<font size= '+3'>Oops! it looks like your total basal area entered for 1a. (",input$totBA,") doesn't match the sum of your entered trees!(",totalBA,")")
             }else{
@@ -834,6 +875,7 @@ shinyApp(
                 paste("<font size= '+3'>Stand degradation level is ","<p><font color=\"#FF0000\"><font size= '+3'><b>",5)
               }
             }
+          }
           }else{
             if(PAG >= cline){
               paste("<font size= '+3'>Stand degradation level is ","<p><font color=\"#FF0000\"><font size= '+3'><b>",1)
