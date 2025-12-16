@@ -471,6 +471,9 @@ shinyApp(
     })
     
     hw_inputs <- reactive({
+      tryCatch({
+        
+      
       # Apply the function to each row of the dataframe to create input pairs
       inputhw_pairs_ui <- lapply(1:nrow(hwdf()), function(i) {
         createhw_input_pair_ui(hwdf()$cname[i], hwdf()$Gen_sp[i])
@@ -478,9 +481,15 @@ shinyApp(
       
       # Combine input pairs into a single UI element
       do.call(tagList, inputhw_pairs_ui)
+      }, error = function(e){
+        NULL
+      })
+      
+      
     })
     
     sw_inputs <- reactive({
+      tryCatch({
       # Apply the function to each row of the dataframe to create input pairs
       inputsw_pairs_ui <- lapply(1:nrow(swdf()), function(i) {
         createsw_input_pair_ui(swdf()$cname[i], swdf()$Gen_sp[i])
@@ -488,9 +497,14 @@ shinyApp(
       
       # Combine input pairs into a single UI element
       do.call(tagList, inputsw_pairs_ui)
+    }, error = function(e){
+      NULL
+    })
+    
     })
     
     perhw_inputs <- reactive({
+      tryCatch({
       # Apply the function to each row of the dataframe to create input pairs
       inputhw_pairs_ui <- lapply(1:nrow(hwdf()), function(i) {
         createhwslider_input_pair_ui(hwdf()$cname[i], hwdf()$Gen_sp[i])
@@ -498,9 +512,14 @@ shinyApp(
       
       # Combine input pairs into a single UI element
       do.call(tagList, inputhw_pairs_ui)
+    }, error = function(e){
+      NULL
+    })
+    
     })
     
     persw_inputs <- reactive({
+      tryCatch({
       # Apply the function to each row of the dataframe to create input pairs
       inputsw_pairs_ui <- lapply(1:nrow(swdf()), function(i) {
         createswslider_input_pair_ui(swdf()$cname[i], swdf()$Gen_sp[i])
@@ -508,54 +527,65 @@ shinyApp(
       
       # Combine input pairs into a single UI element
       do.call(tagList, inputsw_pairs_ui)
+    }, error = function(e){
+      NULL
+    })
+    
     })
     
     SpeciesDataInput <- reactive({
       
-      splist <- sg_ref() %>% pull(Gen_sp)
-      # Use lapply to iterate over the input IDs
-      data_list <- lapply(splist, function(id) {
-        # Check if the input has a non-null value
-        if (!is.null(input[[id]])){
-          # If value is not null, return a dataframe row
-          data.frame(Gen_sp = id, 
-                     AGSValue = input[[id]],
-                     UGSValue = ifelse(input$BAInput != 'Basal Area percentage',
-                                       input[[paste(id,'UGS',sep = "")]],
-                                       (1-input[[paste(id,'AGS',sep = '')]])*input[[id]]),
-                     AGSProp = ifelse(input$BAInput == 'Basal Area percentage',
-                                      input[[id]]*input[[paste(id,"AGS",sep = '')]],
-                                      0)) 
-        } else {
-          # If value is null, return NULL
-          
-          # data.frame(Gen_sp = id, 
-          #            AGSValue = input[[id]],
-          #            UGSValue = ifelse(input$BAInput != 'Basal Area percentage',
-          #                              input[[paste(id,'UGS',sep = "")]],
-          #                              (1-input[[paste(id,'AGS',sep = '')]])*input[[id]]),
-          #            AGSProp = ifelse(input$BAInput == 'Basal Area percentage',
-          #                             input[[id]]*input[[paste(id,"AGS",sep = '')]],
-          #                             0)) 
-        }
+      splist <- sg_ref()$Gen_sp
+      
+      data <- purrr::map_dfr(splist, function(id) {
+        
+        val <- input[[id]]
+        if (is.null(val) || val == 0) return(NULL)
+        
+        ags <- input[[paste0(id, "AGS")]]
+        ugs <- input[[paste0(id, "UGS")]]
+        
+        tibble(
+          Gen_sp  = id,
+          AGSValue = val,
+          AGSProp  = if (input$BAInput == "Basal Area percentage") val * ags else 0,
+          UGSValue = if (input$BAInput == "Basal Area percentage") {
+            (1 - ags) * val
+          } else {
+            ugs
+          }
+        )
       })
       
-      # Use Filter to remove NULL entries
-      data <- do.call(rbind, Filter(function(x) !is.null(x), data_list)) 
+      req(nrow(data) > 0)
       
-      data <- data %>% 
-        mutate(AGSBA = case_when(input$BAInput == 'Prism Plot Data'~ (AGSValue*input$BAF)/input$Nsweeps,
-                                 input$BAInput == 'Basal Area percentage'~ AGSProp*input$totBA,
-                                 TRUE~AGSValue),
-               UGSBA = case_when(input$BAInput == 'Prism Plot Data'~ (UGSValue*input$BAF)/input$Nsweeps,
-                                 input$BAInput == 'Basal Area percentage'~ UGSValue*input$totBA,
-                                 TRUE~UGSValue),
-               TOTBA = AGSBA+UGSBA) %>% 
-        filter(AGSValue!=0) %>% 
-        left_join(sg_ref(),by = join_by(Gen_sp))
+      data <- data %>%
+        mutate(
+          AGSBA =
+            if (input$BAInput == "Prism Plot Data") {
+              (AGSValue * input$BAF) / input$Nsweeps
+            } else if (input$BAInput == "Basal Area percentage") {
+              AGSProp * input$totBA
+            } else {
+              AGSValue
+            },
+          
+          UGSBA =
+            if (input$BAInput == "Prism Plot Data") {
+              (UGSValue * input$BAF) / input$Nsweeps
+            } else if (input$BAInput == "Basal Area percentage") {
+              UGSValue * input$totBA
+            } else {
+              UGSValue
+            },
+          
+          TOTBA = AGSBA + UGSBA
+        ) %>%
+        left_join(sg_ref(), by = "Gen_sp")
       
-      return(data)
+      data
     })
+    
   ## renderUI inputs ####
     output$basalArea <- renderUI({
       if (is.null(input$BAInput))
@@ -697,11 +727,9 @@ shinyApp(
   
  
   ## Render Plot #####      
-  output$testTable <- renderTable({
-    SpeciesDataInput()
-  })
     output$plot  <- renderPlotly({
 
+      
       validate(
         need(
           {
@@ -858,7 +886,8 @@ shinyApp(
                      pull(AGSBA))
       totalBA <- sum(SpeciesDataInput()$TOTBA)
 
-      if(input$BAinput == 'Basal Area percentage'){
+      if(input$BAInput == "Basal Area percentage"){
+
           if(is.null(input$totBA) == FALSE){
             if(totalBA != input$totBA){
               paste("<font size= '+3'>Oops! it looks like your total basal area entered for 1a. (",input$totBA,") doesn't match the sum of your entered trees!(",totalBA,")")
