@@ -53,12 +53,12 @@ A_lineBA <- function(DBH, SG){
 }
 
   ## function to read in and calculate deg for a FVS output ####
-fvs_calc <- function(data, prime,sec,tert){
+fvs_calc <- function(sgrefdata,data,prime,sec,tert){
   # SG_ref <- vroom("SG_ref.csv", col_types = "ffnn")
-  
+  sgrefdata
   removedSp <- c("ACSA3","FAGR","TSCA","PIRU","BEAL2","ACRU","ABBA","ACPE")
   
-  sg_ref()$splist <- sub("^0+", "", sg_ref()$splist)
+  sgrefdata$splist <- sub("^0+", "", sgrefdata$splist)
   
   #remove rows that have plant ID instead of fia sp codes
   data<- data[!grepl(paste(removedSp, collapse="|"), data$Species),]
@@ -68,7 +68,7 @@ fvs_calc <- function(data, prime,sec,tert){
   
   #join fvs data SG ref so we have specific gravity for all species
   df1 <- data%>%
-    full_join(sg_ref(), by = c("Species" = "splist"))
+    full_join(sgrefdata, by = c("Species" = "splist"))
   
   #create coloumns for tree factor, relative density, and counting trees by desirability.
   df1.2 <- df1%>%
@@ -319,9 +319,6 @@ shinyApp(
                ),
     ### Main panel#####
                mainPanel(
-                 # fluidRow(style = "padding-left: 200px",align = "center",
-                 #          tableOutput("testTable")
-                 # ),
                  fluidRow(style = "padding-left: 200px",align = "center",
                            plotlyOutput("plot",width = 600, height = 700),
 
@@ -581,7 +578,7 @@ shinyApp(
           
           TOTBA = AGSBA + UGSBA
         ) %>%
-        left_join(sg_ref(), by = "Gen_sp")
+        left_join(sg_ref(), by = "Gen_sp") 
       
       data
     })
@@ -777,13 +774,19 @@ shinyApp(
         b_line <- round(B_lineBA(input$exactDBH, Avg_SG),2)
         a_line<- round(A_lineBA(input$exactDBH, Avg_SG),2)
       }
-    
-      PrimeBA <- sum(SpeciesDataInput() %>% filter(desirability == 1) %>% pull(AGSBA))
-      secBA <- sum(SpeciesDataInput() %>% filter(desirability == 2) %>% pull(AGSBA))
-      tertBA <- sum(SpeciesDataInput() %>% filter(desirability == 3) %>% pull(AGSBA))
+      if(length(primaryInput())<1){
+        PrimeBA <- sum(SpeciesDataInput() %>% filter(desirability == 1) %>% pull(AGSBA))
+        secBA <- sum(SpeciesDataInput() %>% filter(desirability == 2) %>% pull(AGSBA))
+        tertBA <- sum(SpeciesDataInput() %>% filter(desirability == 3) %>% pull(AGSBA))
+        UgsBA <- sum(SpeciesDataInput() %>% pull(UGSBA))
+        totalBA <- sum(SpeciesDataInput() %>% pull(TOTBA))
+      }else{
+      PrimeBA <- sum(SpeciesDataInput() %>% filter(Gen_sp %in% primaryInput()) %>% pull(AGSBA))
+      secBA <- sum(SpeciesDataInput() %>% filter(Gen_sp %in% SecondaryInput()) %>% pull(AGSBA))
+      tertBA <- sum(SpeciesDataInput() %>% filter(Gen_sp %in% TertiaryInput()) %>% pull(AGSBA))
       UgsBA <- sum(SpeciesDataInput() %>% pull(UGSBA))
       totalBA <- sum(SpeciesDataInput() %>% pull(TOTBA))
-      
+      }
       hline <- function(y = 0, color = "black") {
         list(
           type = "line", 
@@ -873,18 +876,29 @@ shinyApp(
         cline <- round(C_lineBA(input$exactDBH, Avg_SG),2)
         
       }
-      
-      
+      if(length(primaryInput())<1){
+        PAG <- sum(SpeciesDataInput() %>% 
+                     filter(desirability == 1) %>% 
+                     pull(AGSBA))
+        PSAG <- sum(SpeciesDataInput() %>% 
+                      filter(desirability <= 2) %>% 
+                      pull(AGSBA))
+        PSTAG <- sum(SpeciesDataInput() %>% 
+                       filter(desirability <= 3) %>% 
+                       pull(AGSBA))
+        totalBA <- sum(SpeciesDataInput()$TOTBA)
+      }else{
       PAG <- sum(SpeciesDataInput() %>% 
-                   filter(desirability == 1) %>% 
+                   filter(Gen_sp %in% primaryInput()) %>% 
                    pull(AGSBA))
       PSAG <- sum(SpeciesDataInput() %>% 
-                    filter(desirability <= 2) %>% 
+                    filter(Gen_sp %in% c(primaryInput(),SecondaryInput())) %>% 
                     pull(AGSBA))
       PSTAG <- sum(SpeciesDataInput() %>% 
-                     filter(desirability <= 3) %>% 
+                     filter(Gen_sp %in% c(primaryInput(),SecondaryInput(),TertiaryInput())) %>% 
                      pull(AGSBA))
       totalBA <- sum(SpeciesDataInput()$TOTBA)
+      }
 
       if(input$BAInput == "Basal Area percentage"){
 
@@ -922,16 +936,25 @@ shinyApp(
       
     })
     
-
-    output$allInputs  <- renderPrint({
-     print(hw_inputs())
-   })
-
   ## Render Display Table (treelist input) ####
     output$FVS <- renderDataTable({
-      
-      fvs_calc(datasetInput(),primaryInput(),SecondaryInput(),TertiaryInput())
-     
+      if(length(primaryInput())<1){
+        prime <- sg_ref() %>% 
+          filter(desirability == 1) %>% 
+          pull(Gen_sp)
+        
+        sec <- sg_ref() %>% 
+          filter(desirability == 2) %>% 
+          pull(Gen_sp)
+        
+        tert <- sg_ref() %>% 
+          filter(desirability == 3) %>% 
+          pull(Gen_sp)
+        
+        fvs_calc(sg_ref(),datasetInput(),prime,sec,tert)
+      }else{
+      fvs_calc(sg_ref(),datasetInput(),primaryInput(),SecondaryInput(),TertiaryInput())
+      }
     })
 
   ## Downloader Data Table ####

@@ -1,0 +1,12 @@
+name: DegradationCalculator
+title: DegradationCalculator
+username: mthompsonunh
+account: mthompsonunh
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 16379054
+bundleId: 11407087
+url: https://mthompsonunh.shinyapps.io/DegradationCalculator/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
